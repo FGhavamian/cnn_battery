@@ -1,8 +1,6 @@
 data/
-!data/__init__.py
 fem_davide
 output/
-!output/__init__.py
 report
 *.tfrecords
 *.pkl
