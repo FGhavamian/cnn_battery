@@ -11,14 +11,14 @@ def get_train_val_test_paths(case_dir):
     paths_mesh = glob.glob(os.path.join(case_dir, "mesh", "*.mesh"))
     paths_vtu = glob.glob(os.path.join(case_dir, "vtu", "*.vtu"))
 
-    names = [path.split("/")[-1].replace(".mesh", "") for path in paths_mesh]
+    names = [path.split(os.sep)[-1].replace(".mesh", "") for path in paths_mesh]
 
     from sklearn.model_selection import train_test_split
     names_train, names_test = train_test_split(names, test_size=0.1, random_state=123)
     # names_train, names_val = train_test_split(names_train, test_size=0.1, random_state=123)
 
-    paths_mesh = {p.split("/")[-1].replace(".mesh", ""): p for p in paths_mesh}
-    paths_vtu = {p.split("/")[-1].replace(".vtu", ""): p for p in paths_vtu}
+    paths_mesh = {p.split(os.sep)[-1].replace(".mesh", ""): p for p in paths_mesh}
+    paths_vtu = {p.split(os.sep)[-1].replace(".vtu", ""): p for p in paths_vtu}
 
     # return names_train, names_test, names_val, paths_mesh, paths_vtu
     return names_train, names_test, paths_mesh, paths_vtu
@@ -333,10 +333,18 @@ def make_output_dir(path_output, features):
     if not os.path.exists(path_output):
         os.makedirs(path_output)
         return path_output
-    else:
+    elif (
+            os.path.exists(os.path.join(path_output, 'tfrecords', 'train_0.tfrecords')) and
+            os.path.exists(os.path.join(path_output, 'tfrecords', 'test_0.tfrecords')) and
+            os.path.exists(os.path.join(path_output, 'grid.pkl')) and
+            os.path.exists(os.path.join(path_output, 'names.json')) and
+            os.path.exists(os.path.join(path_output, 'stats_x.pkl')) and
+            os.path.exists(os.path.join(path_output, 'stats_y.pkl'))):
+
         import sys
         sys.exit('Tfrecords files already exist')
-        # return path_output
+    else:
+        return path_output
 
 
 if __name__ == '__main__':
@@ -393,4 +401,3 @@ if __name__ == '__main__':
 
     tfrecords.write(pp_train, mode='train', names=names_train)
     tfrecords.write(pp_test, mode='test', names=names_test)
-

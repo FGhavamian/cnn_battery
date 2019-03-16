@@ -15,7 +15,7 @@ MODEL_NAMES = [
     # 'hydra_unet_v0',
     # 'hydra_v2',
     'simple_cnn',
-    'hydra_scalar_v2'
+    # 'hydra_scalar_v2'
 ]
 
 FEATURE_NAMES = [
@@ -38,7 +38,7 @@ def make_data(features):
         features = [features]
 
     command = (
-        'python3 -m trainer.preprocess' 
+        'python -m trainer.preprocess' 
         ' --features={}'
     ).format(','.join(features))
 
@@ -51,7 +51,7 @@ def train(job_name, feature_name, model_name):
     path_tfrecords = os.path.join('data', 'processed', feature_name, 'tfrecords')
 
     command = (
-        'python3 -m trainer.train'
+        'python -m trainer.train'
         ' --model-name={}'
         ' --job-name={}'
         ' --feature-name={}'
