@@ -1,6 +1,6 @@
-#Common commands
+# Common commands
 
-##Training:
+## Training:
 <code>python -m 
 trainer.train 
 --epoch-num=5 
@@ -8,7 +8,7 @@ trainer.train
 --model-name=simple_cnn 
 --path-tfrecords=data/ex2</code>
 
-##preprocess:
+## preprocess:
 <code>python -m 
 trainer.preprocess 
 --path-data data/ex2</code>
