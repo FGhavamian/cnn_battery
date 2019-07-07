@@ -8,6 +8,10 @@ from trainer.names import *
 
 
 def get_train_val_test_paths(case_dir):
+
+    if not os.path.exists(case_dir):
+        raise IOError(f'directory {case_dir} does not exist')
+
     paths_mesh = glob.glob(os.path.join(case_dir, "mesh", "*.mesh"))
     paths_vtu = glob.glob(os.path.join(case_dir, "vtu", "*.vtu"))
 
@@ -43,14 +47,14 @@ class DataHolder:
         """
         mesh_dict = dict(
             coord=coord,
-            groups_node=groups_node,
-            groups_element_nodes=groups_element_nodes,
-            element_connect=element_connect)
+            connect=element_connect,
+            groups_nodes=groups_node,
+            groups_element_nodes=groups_element_nodes)
 
         self.mesh_data[name] = mesh_dict
         self.compiled = False
 
-    def add_to_vtu_data(self, name, coord, solutions):
+    def add_to_vtu_data(self, name, coord, connects, solutions):
         """
         Add vtu data.
         Args:
@@ -63,6 +67,7 @@ class DataHolder:
 
         vtu_dict = dict(
             coord=coord,
+            connect=connects,
             solutions=sols)
 
         self.vtu_data[name] = vtu_dict
@@ -117,9 +122,9 @@ class PreprocessBatch(DataHolder):
             self.x_names = list(groups_node.keys())
 
             if paths_vtu:
-                nodes_coord_vtu, solutions = read_vtu(file_path=paths_vtu[case_name])
+                nodes_coord_vtu, connects, solutions = read_vtu(file_path=paths_vtu[case_name])
 
-                self.add_to_vtu_data(case_name, nodes_coord_vtu, solutions)
+                self.add_to_vtu_data(case_name, nodes_coord_vtu, connects, solutions)
                 # self.y_names = list(solutions.keys())
 
         print()

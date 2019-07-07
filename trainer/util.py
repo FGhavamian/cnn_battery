@@ -230,6 +230,9 @@ class MeshParser:
         element_nodes = [n for n in element_nodes if n]
         element_nodes = [[int(node) for node in nodes.split(' ')] for nodes in element_nodes]
         element_nodes = {nodes[0]: [n for n in nodes[1:]] for nodes in element_nodes}
+        # element_nodes = [[n for n in nodes[1:]] for nodes in element_nodes]
+        # element_nodes = np.array(element_nodes)
+
 
         return element_nodes
 
@@ -277,6 +280,8 @@ def read_mesh(file_path):
         groups_element_nodes = mesh_parse.get_nodes_in_element_groups()
         element_connect = mesh_parse.get_element_connect()
 
+        element_connect = np.array([element_connect[e] for e in sorted(list(element_connect.keys()))])
+
         return np.array(nodes_coord, np.float32), groups_node, groups_element_nodes, element_connect
 
 
@@ -296,15 +301,23 @@ def read_vtu(file_path):
             idx_start_nodes = idx + 1
             countingNodes = True
 
-        elif "/DataArray" in line and countingNodes == True:
+        elif "/DataArray" in line and countingNodes is True:
             idx_end_nodes = idx
             countingNodes = False
+
+        elif "connectivity" in line:
+            idx_start_connect = idx + 1
+            countingConnect = True
+
+        elif "/DataArray" in line and countingConnect is True:
+            idx_end_connect = idx
+            countingConnect = False
 
         elif "deformations" in line:
             idx_start_deformations = idx + 1
             countingDeformations = True
 
-        elif "/DataArray" in line and countingDeformations == True:
+        elif "/DataArray" in line and countingDeformations is True:
             idx_end_deformations = idx
             countingDeformations = False
 
@@ -312,7 +325,7 @@ def read_vtu(file_path):
             idx_start_stresses = idx + 1
             countingStresses = True
 
-        elif "/DataArray" in line and countingStresses == True:
+        elif "/DataArray" in line and countingStresses is True:
             idx_end_stresses = idx
             countingStresses = False
 
@@ -320,7 +333,7 @@ def read_vtu(file_path):
             idx_start_current = idx + 1
             countingCurrent = True
 
-        elif "/DataArray" in line and countingCurrent == True:
+        elif "/DataArray" in line and countingCurrent is True:
             idx_end_current = idx
             countingCurrent = False
 
@@ -328,7 +341,7 @@ def read_vtu(file_path):
             idx_start_fluxes = idx + 1
             countingFluxes = True
 
-        elif "/DataArray" in line and countingFluxes == True:
+        elif "/DataArray" in line and countingFluxes is True:
             idx_end_fluxes = idx
             countingFluxes = False
 
@@ -343,6 +356,18 @@ def read_vtu(file_path):
                                  .split(" ")[:-1]
         node_coords = [float(n) for n in node_coords_string]
         nodes_coords.append(node_coords)
+
+    # element to nodes
+    connects_string = content[idx_start_connect:idx_end_connect]
+    connects = []
+    for connect_string in connects_string:
+        connect_string = connect_string.replace("\n", "") \
+                                 .replace("\t", "", 5) \
+                                 .replace("\t", " ", 2) \
+                                 .replace("\t", "", 1) \
+                                 .split(" ")
+        connect = [int(n) for n in connect_string]
+        connects.append(connect)
 
     # nodal deformations
     deformations_string = content[idx_start_deformations:idx_end_deformations]
@@ -399,6 +424,7 @@ def read_vtu(file_path):
     # convert to numpy
     nodes_coords = np.array(nodes_coords, dtype=np.float32)
     deformations = np.array(deformations, dtype=np.float32)
+    connects = np.array(connects, dtype=np.int32)
     stresses = np.array(stresses, dtype=np.float32)
     currents = np.array(currents, dtype=np.float32)
     fluxes = np.array(fluxes, dtype=np.float32)
@@ -413,7 +439,7 @@ def read_vtu(file_path):
 
     sol = dict(deformations=deformations, stresses=stresses, currents=currents, fluxes=fluxes)
 
-    return nodes_coords, sol
+    return nodes_coords, connects, sol
 
 
 class VtuWriter:
