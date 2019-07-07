@@ -2,6 +2,7 @@ data/
 fem_davide
 output/
 report
+.idea/*
 *.tfrecords
 *.pkl
 *.vtu

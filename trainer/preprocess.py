@@ -1,6 +1,9 @@
 import argparse
 
 from scipy.interpolate import NearestNDInterpolator
+from scipy.spatial import Delaunay
+import pandas as pd
+import numpy as np
 
 from trainer.util import *
 from trainer.features import FeatureMaker
@@ -8,7 +11,6 @@ from trainer.names import *
 
 
 def get_train_val_test_paths(case_dir):
-
     if not os.path.exists(case_dir):
         raise IOError(f'directory {case_dir} does not exist')
 
@@ -62,13 +64,15 @@ class DataHolder:
             coord (NumPy ndarray): the nodal coordinates
             solutions (dict of str: NumPy ndarray): name of solution field to the solution field
         """
-        sols = [solutions[name] for name in SOLUTION_DIMS]
-        sols = np.concatenate(sols, axis=1)
+        solutions = {(name, dim): solutions[name][:, dim] for name in SOLUTION_DIMS for dim in range(SOLUTION_DIMS[name])}
+        df_sols = pd.DataFrame(solutions)
+        # sols = [solutions[name] for name in SOLUTION_DIMS]
+        # sols = np.concatenate(sols, axis=1)
 
         vtu_dict = dict(
             coord=coord,
             connect=connects,
-            solutions=sols)
+            solutions=df_sols)
 
         self.vtu_data[name] = vtu_dict
         self.compiled = False
@@ -97,18 +101,32 @@ class PreprocessBatch(DataHolder):
         if not self.mesh_data:
             raise (Exception('Set mesh first!'))
 
+        self.mesh_data = self.__to_delaunay(self.mesh_data)
+        self.vtu_data = self.__to_delaunay(self.vtu_data)
+
         self.grid = self.__get_grid(self.is_train)
+        self.mask = self.__make_mask()
 
-        self.__make_mask()
+        features = self.__encode_geometry()
+        targets = {name: data['solutions'] for name, data in self.vtu_data.items()}
 
-        self.__encode_geometry()
+        self.x = self.__interpolate(features, self.grid['grid'], self.mesh_data)
         self.x = self.__standardize('x', self.x)
 
         if self.vtu_data:
-            self.__interpolate_solution()
+            self.y = self.__interpolate(targets, self.grid['grid'], self.vtu_data)
             self.y = self.__standardize('y', self.y)
 
         self.compiled = True
+
+        # import matplotlib.pyplot as plt
+        # for i in range(self.y.shape[-1]):
+        #     plt.figure()
+        #     plt.contourf(
+        #         self.grid['grid'][:, 0].reshape(self.grid['dim']),
+        #         self.grid['grid'][:, 1].reshape(self.grid['dim']),
+        #         self.y[0, :, i].reshape(self.grid['dim']))
+        #     plt.show()
 
     def populate(self, case_names, paths_mesh, paths_vtu=None):
         if not isinstance(case_names, list):
@@ -128,6 +146,83 @@ class PreprocessBatch(DataHolder):
                 # self.y_names = list(solutions.keys())
 
         print()
+
+    @staticmethod
+    def __shape_func_tri3(coord, el_coords):
+        x1 = el_coords[0][0]; y1 = el_coords[0][1]
+        x2 = el_coords[1][0]; y2 = el_coords[1][1]
+        x3 = el_coords[2][0]; y3 = el_coords[2][1]
+
+        a0 = x1; b0 = y1
+        a1 = x2 - x1; b1 = y2 - y1
+        a2 = x3 - x1; b2 = y3 - y1
+
+        xhat = coord[0]; yhat = coord[1]
+
+        etahat = (a1 * yhat - b1 * xhat + b1 * a0 - a1 * b0) / (a1 * b2 - a2 * b1 + 1e-8)
+        xihat = (xhat - a0 - a2 * etahat) / (a1 + 1e-8)
+
+        n1 = 1 - xihat - etahat
+        n2 = xihat
+        n3 = etahat
+
+        n = np.array([n1, n2, n3])
+
+        return n
+
+    @staticmethod
+    def __find_grids_in_each_element(grid, mesh):
+        point_to_element = mesh.find_simplex(grid, bruteforce=True, tol=1e-1)
+        element_to_point = [None for e in range(len(mesh.simplices))]
+
+        for eid in range(len(element_to_point)):
+            element_to_point[eid] = np.where(point_to_element == eid)[0]
+
+        return element_to_point
+
+    def __interpolate(self, fields_dict, grid, mesh_data):
+        fields_on_grid = []
+
+        for case_name in fields_dict.keys():
+            mesh = mesh_data[case_name]['mesh']
+            fields = fields_dict[case_name]
+
+            # find elements containing grid points
+            element_to_point = self.__find_grids_in_each_element(grid, mesh)
+            element_to_point_some = {e: ps for e, ps in enumerate(element_to_point) if len(ps) > 0}
+
+            # interpolate solutions
+            grid_fields = [np.zeros([fields.shape[1]]) for _ in range(len(grid))]
+
+            for e, grid_nums in element_to_point_some.items():
+                el_nodes = mesh.simplices[e]
+                el_coords = mesh.points[el_nodes]
+                el_fields = fields.iloc[el_nodes].values
+
+                for grid_num in grid_nums:
+                    grid_coord = grid[grid_num]
+                    n = self.__shape_func_tri3(grid_coord, el_coords)
+                    grid_field = n.dot(el_fields)
+
+                    grid_fields[grid_num] = grid_field
+
+            grid_fields = np.stack(grid_fields, axis=0)
+
+            # append interolated somlutions
+            fields_on_grid.append(grid_fields)
+
+        fields_on_grid = np.stack(fields_on_grid, axis=0)
+
+        return fields_on_grid
+
+    @staticmethod
+    def __to_delaunay(data_dict):
+        for name, data in data_dict.items():
+            mesh = Delaunay(data['coord'])
+            mesh.simplices = data['connect'].astype(np.int32)
+            data_dict[name]['mesh'] = mesh
+
+        return data_dict
 
     def __get_grid(self, is_train):
         if is_train:
@@ -152,23 +247,22 @@ class PreprocessBatch(DataHolder):
 
         case_names = list(self.mesh_data.keys())
 
-        features_batch = []
+        features = {}
         for case_name in case_names:
             feature_maker = FeatureMaker(
-                self.grid["grid"],
                 self.mesh_data[case_name],
                 feature_to_include=self.feature_name
             )
 
-            features = feature_maker()
+            df_features = feature_maker()
 
-            features_batch.append(features)
-
-        self.x = np.stack(features_batch)
-        self.x = self.x.reshape(-1, *self.grid["dim"], self.x.shape[-1])
+            features[case_name] = df_features
 
         # end_time = time.time()
         # print(end_time - start_time)
+
+        return features
+
 
     def __interpolate_solution(self):
         print('interpolating solution field on the grid')
@@ -236,7 +330,7 @@ class PreprocessBatch(DataHolder):
 
             masks.append(mask)
 
-        self.mask = np.stack(masks)
+        return np.stack(masks)
 
     def __make_grid(self):
         x_max = 0
@@ -356,36 +450,35 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        '--features',
+        '--features', '-f',
         help='name of features to include, underscored seperated',
         type=lambda x: sorted(x.split('_')),
         required=True
     )
 
     parser.add_argument(
-        '--path-data',
+        '--path-data', '-d',
         help='path to mesh and vtu files',
         default=os.path.join('data', 'raw', 'ex2')
     )
 
     parser.add_argument(
-        '--path-output',
+        '--path-output', '-o',
         help='path where processed data are stored',
         default=os.path.join('data', 'processed')
     )
 
     args = parser.parse_args()
-
     args.path_output = make_output_dir(args.path_output, args.features)
-
-    pp_train = PreprocessBatch(is_train=True, path_output=args.path_output, feature_name=args.features)
-    pp_test = PreprocessBatch(is_train=False, path_output=args.path_output, feature_name=args.features)
 
     print('reading mesh and vtu files')
     names_train, names_test, paths_mesh, paths_vtu = get_train_val_test_paths(args.path_data)
 
-    # names_train = ['Rc_1.0_h_20.2_tac_10.0_tel_6.0', 'Rc_1.0_h_49.3_tac_10.0_tel_18.0']
-    # print(names_train)
+    pp_train = PreprocessBatch(is_train=True, path_output=args.path_output, feature_name=args.features)
+    pp_test = PreprocessBatch(is_train=False, path_output=args.path_output, feature_name=args.features)
+
+    names_train = ['Rc_1.0_h_20.2_tac_10.0_tel_6.0', 'Rc_1.0_h_49.3_tac_10.0_tel_18.0']
+    print(names_train)
 
     write_json(
         file_path=os.path.join(args.path_output, 'names.json'),
@@ -393,16 +486,15 @@ if __name__ == '__main__':
     )
 
     pp_train.populate(names_train, paths_mesh, paths_vtu)
-    pp_test.populate(names_test, paths_mesh, paths_vtu)
-
-    # compile pp classes
+    # pp_test.populate(names_test, paths_mesh, paths_vtu)
+    #
     print('compiling preprocess classes')
     pp_train.compile()
-    pp_test.compile()
-
-    # save data to file
-    print('writing tfrecords files')
-    tfrecords = Tfrecords(path_output=args.path_output)
-
-    tfrecords.write(pp_train, mode='train', names=names_train)
-    tfrecords.write(pp_test, mode='test', names=names_test)
+    # pp_test.compile()
+    #
+    # # save data to file
+    # print('writing tfrecords files')
+    # tfrecords = Tfrecords(path_output=args.path_output)
+    #
+    # tfrecords.write(pp_train, mode='train', names=names_train)
+    # tfrecords.write(pp_test, mode='test', names=names_test)
