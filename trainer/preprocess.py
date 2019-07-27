@@ -1,11 +1,12 @@
 import argparse
 
-from scipy.interpolate import NearestNDInterpolator
+from sklearn.model_selection import train_test_split
 from scipy.spatial import Delaunay
 import pandas as pd
-import numpy as np
+from tqdm import tqdm
+from joblib import Parallel, delayed
 
-from trainer.util import *
+from trainer.utils.util import *
 from trainer.features import FeatureMaker
 from trainer.names import *
 
@@ -18,10 +19,7 @@ def get_train_val_test_paths(case_dir):
     paths_vtu = glob.glob(os.path.join(case_dir, "vtu", "*.vtu"))
 
     names = [path.split(os.sep)[-1].replace(".mesh", "") for path in paths_mesh]
-
-    from sklearn.model_selection import train_test_split
-    names_train, names_test = train_test_split(names, test_size=0.1, random_state=123)
-    # names_train, names_val = train_test_split(names_train, test_size=0.1, random_state=123)
+    names_train, names_test = train_test_split(names, test_size=0.2, random_state=123)
 
     paths_mesh = {p.split(os.sep)[-1].replace(".mesh", ""): p for p in paths_mesh}
     paths_vtu = {p.split(os.sep)[-1].replace(".vtu", ""): p for p in paths_vtu}
@@ -101,21 +99,25 @@ class PreprocessBatch(DataHolder):
         if not self.mesh_data:
             raise (Exception('Set mesh first!'))
 
-        self.mesh_data = self.__to_delaunay(self.mesh_data)
-        self.vtu_data = self.__to_delaunay(self.vtu_data)
+        self.mesh_data = self._to_delaunay(self.mesh_data)
+        self.vtu_data = self._to_delaunay(self.vtu_data)
 
-        self.grid = self.__get_grid(self.is_train)
-        self.mask = self.__make_mask()
+        self.grid = self._get_grid(self.is_train)
+        self.mask = self._make_mask()
 
-        features = self.__encode_geometry()
+        print('\t[INFO] encoding geometry ...')
+        features = self._encode_geometry()
         targets = {name: data['solutions'] for name, data in self.vtu_data.items()}
 
-        self.x = self.__interpolate(features, self.grid['grid'], self.mesh_data)
-        self.x = self.__standardize('x', self.x)
+        print('\t[INFO] interpolating features ...')
+
+        self.x = self._interpolate(features, self.grid['grid'], self.mesh_data)
+        self.x = self._standardize('x', self.x)
 
         if self.vtu_data:
-            self.y = self.__interpolate(targets, self.grid['grid'], self.vtu_data)
-            self.y = self.__standardize('y', self.y)
+            print('\t[INFO] interpolating solutions ...')
+            self.y = self._interpolate(targets, self.grid['grid'], self.vtu_data)
+            self.y = self._standardize('y', self.y)
 
         self.compiled = True
 
@@ -148,7 +150,7 @@ class PreprocessBatch(DataHolder):
         print()
 
     @staticmethod
-    def __shape_func_tri3(coord, el_coords):
+    def _shape_func_tri3(coord, el_coords):
         x1 = el_coords[0][0]; y1 = el_coords[0][1]
         x2 = el_coords[1][0]; y2 = el_coords[1][1]
         x3 = el_coords[2][0]; y3 = el_coords[2][1]
@@ -171,7 +173,7 @@ class PreprocessBatch(DataHolder):
         return n
 
     @staticmethod
-    def __find_grids_in_each_element(grid, mesh):
+    def _find_grids_in_each_element(grid, mesh):
         point_to_element = mesh.find_simplex(grid, bruteforce=True, tol=1e-1)
         element_to_point = [None for e in range(len(mesh.simplices))]
 
@@ -180,15 +182,15 @@ class PreprocessBatch(DataHolder):
 
         return element_to_point
 
-    def __interpolate(self, fields_dict, grid, mesh_data):
+    def _interpolate(self, fields_dict, grid, mesh_data):
         fields_on_grid = []
 
-        for case_name in fields_dict.keys():
+        def interpolator(case_name):
             mesh = mesh_data[case_name]['mesh']
             fields = fields_dict[case_name]
 
             # find elements containing grid points
-            element_to_point = self.__find_grids_in_each_element(grid, mesh)
+            element_to_point = self._find_grids_in_each_element(grid, mesh)
             element_to_point_some = {e: ps for e, ps in enumerate(element_to_point) if len(ps) > 0}
 
             # interpolate solutions
@@ -201,22 +203,23 @@ class PreprocessBatch(DataHolder):
 
                 for grid_num in grid_nums:
                     grid_coord = grid[grid_num]
-                    n = self.__shape_func_tri3(grid_coord, el_coords)
+                    n = self._shape_func_tri3(grid_coord, el_coords)
                     grid_field = n.dot(el_fields)
 
                     grid_fields[grid_num] = grid_field
 
             grid_fields = np.stack(grid_fields, axis=0)
+            grid_fields = grid_fields.reshape(*self.grid['dim'] + (-1,))
+            return grid_fields
 
-            # append interolated somlutions
-            fields_on_grid.append(grid_fields)
-
+        fields_on_grid = Parallel(n_jobs=8, prefer="threads")(delayed(interpolator)(case_name) for case_name in tqdm(fields_dict.keys()))
         fields_on_grid = np.stack(fields_on_grid, axis=0)
+        fields_on_grid = fields_on_grid.astype(np.float32)
 
         return fields_on_grid
 
     @staticmethod
-    def __to_delaunay(data_dict):
+    def _to_delaunay(data_dict):
         for name, data in data_dict.items():
             mesh = Delaunay(data['coord'])
             mesh.simplices = data['connect'].astype(np.int32)
@@ -224,31 +227,29 @@ class PreprocessBatch(DataHolder):
 
         return data_dict
 
-    def __get_grid(self, is_train):
+    def _get_grid(self, is_train):
         if is_train:
-            print('making grid')
-            return self.__make_grid()
+            return self._make_grid()
         else:
-            return self.__load_grid()
+            return self._load_grid()
 
-    def __standardize(self, mode, d):
+    def _standardize(self, mode, d):
         if self.is_train:
-            stats = self.__compute_stats(d, mode=mode)
+            stats = self._compute_stats(d, mode=mode)
         else:
-            stats = self.__load_stats(mode=mode)
+            stats = self._load_stats(mode=mode)
 
-        d = self.__normalize(d, stats)
+        d = self._normalize(d, stats)
 
         return d
 
-    def __encode_geometry(self):
-        print('encoding geometry')
+    def _encode_geometry(self):
         # start_time = time.time()
 
         case_names = list(self.mesh_data.keys())
 
         features = {}
-        for case_name in case_names:
+        for case_name in tqdm(case_names):
             feature_maker = FeatureMaker(
                 self.mesh_data[case_name],
                 feature_to_include=self.feature_name
@@ -264,34 +265,32 @@ class PreprocessBatch(DataHolder):
         return features
 
 
-    def __interpolate_solution(self):
-        print('interpolating solution field on the grid')
-
-        case_names = list(self.vtu_data.keys())
-        grid = self.grid["grid"]
-
-        targets_batch = []
-        for case_name in case_names:
-            node_coord = self.vtu_data[case_name]["coord"]
-
-            target_on_node = self.vtu_data[case_name]["solutions"]
-
-            f = NearestNDInterpolator(node_coord, target_on_node)
-
-            target_on_grid = f(grid)
-
-            targets_batch.append(target_on_grid)
-
-        self.y = np.stack(targets_batch)
-        self.y = self.y.reshape(-1, *self.grid["dim"], self.y.shape[-1])
+    # def _interpolate_solution(self):
+    #     case_names = list(self.vtu_data.keys())
+    #     grid = self.grid["grid"]
+    #
+    #     targets_batch = []
+    #     for case_name in case_names:
+    #         node_coord = self.vtu_data[case_name]["coord"]
+    #
+    #         target_on_node = self.vtu_data[case_name]["solutions"]
+    #
+    #         f = NearestNDInterpolator(node_coord, target_on_node)
+    #
+    #         target_on_grid = f(grid)
+    #
+    #         targets_batch.append(target_on_grid)
+    #
+    #     self.y = np.stack(targets_batch)
+    #     self.y = self.y.reshape(-1, *self.grid["dim"], self.y.shape[-1])
 
     @staticmethod
-    def __normalize(x, stats):
+    def _normalize(x, stats):
         x = (x - stats["mean"]) / (stats["std"] + 1e-8)
 
         return x
 
-    def __compute_stats(self, x, mode):
+    def _compute_stats(self, x, mode):
         mean_s = np.mean(x, axis=(0, 1, 2), keepdims=True, dtype=np.float32)
         std_s = np.std(x, axis=(0, 1, 2), keepdims=True, dtype=np.float32)
 
@@ -302,7 +301,7 @@ class PreprocessBatch(DataHolder):
 
         return stats
 
-    def __load_stats(self, mode):
+    def _load_stats(self, mode):
         with open(os.path.join(self.path_output, "stats_{}.pkl".format(mode)), 'rb') as f:
             stats = pickle.load(f)
 
@@ -312,9 +311,7 @@ class PreprocessBatch(DataHolder):
 
         return stats
 
-    def __make_mask(self):
-        print('making masks')
-
+    def _make_mask(self):
         case_names = list(self.mesh_data.keys())
 
         masks = []
@@ -332,7 +329,7 @@ class PreprocessBatch(DataHolder):
 
         return np.stack(masks)
 
-    def __make_grid(self):
+    def _make_grid(self):
         x_max = 0
         y_max = 0
 
@@ -363,7 +360,7 @@ class PreprocessBatch(DataHolder):
 
         return grid
 
-    def __load_grid(self):
+    def _load_grid(self):
         return load_from_pickle(path=os.path.join(self.path_output, 'grid.pkl'))
 
 
@@ -389,13 +386,12 @@ class Tfrecords:
             mask_chunk = mask_chunks[idx]
             name_chunk = name_chunks[idx]
 
-            with tf.python_io.TFRecordWriter(tf_filename) as tfrecords_writer:
+            with tf.io.TFRecordWriter(tf_filename) as tfrecords_writer:
                 for idx_case in range(x_chunk.shape[0]):
                     x = x_chunk[idx_case]
                     y = y_chunk[idx_case]
                     mask = mask_chunk[idx_case]
                     name = name_chunk[idx_case]
-
                     self.add_to_tfrecords(x, y, mask, name, tfrecords_writer)
 
     def add_to_tfrecords(self, x, y, mask, name, tfrecords_writer):
@@ -471,14 +467,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.path_output = make_output_dir(args.path_output, args.features)
 
-    print('reading mesh and vtu files')
+    print('[INFO] reading mesh and vtu files ...')
     names_train, names_test, paths_mesh, paths_vtu = get_train_val_test_paths(args.path_data)
 
     pp_train = PreprocessBatch(is_train=True, path_output=args.path_output, feature_name=args.features)
     pp_test = PreprocessBatch(is_train=False, path_output=args.path_output, feature_name=args.features)
 
-    names_train = ['Rc_1.0_h_20.2_tac_10.0_tel_6.0', 'Rc_1.0_h_49.3_tac_10.0_tel_18.0']
-    print(names_train)
+    # names_train = ['Rc_1.0_h_20.2_tac_10.0_tel_6.0', 'Rc_1.0_h_49.3_tac_10.0_tel_18.0']
+    # print(names_train)
 
     write_json(
         file_path=os.path.join(args.path_output, 'names.json'),
@@ -486,15 +482,15 @@ if __name__ == '__main__':
     )
 
     pp_train.populate(names_train, paths_mesh, paths_vtu)
-    # pp_test.populate(names_test, paths_mesh, paths_vtu)
-    #
-    print('compiling preprocess classes')
+    pp_test.populate(names_test, paths_mesh, paths_vtu)
+
+    print('[INFO] compiling preprocess classes ...')
     pp_train.compile()
-    # pp_test.compile()
-    #
-    # # save data to file
-    # print('writing tfrecords files')
-    # tfrecords = Tfrecords(path_output=args.path_output)
-    #
-    # tfrecords.write(pp_train, mode='train', names=names_train)
-    # tfrecords.write(pp_test, mode='test', names=names_test)
+    pp_test.compile()
+
+    # save data to file
+    print('[INFO] writing tfrecords files ...')
+    tfrecords = Tfrecords(path_output=args.path_output)
+
+    tfrecords.write(pp_train, mode='train', names=names_train)
+    tfrecords.write(pp_test, mode='test', names=names_test)

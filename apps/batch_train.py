@@ -1,29 +1,27 @@
 from datetime import datetime
-import os
-import glob
 
-from trainer.util import *
+from trainer.utils.util import *
 
 
-NUM_TESTS = 5
+NUM_TESTS = 1
 
 MODEL_NAMES = [
-    # 'hydra_v0',
+    'hydra_v0',
     # 'hydra_scalar_v0',
     # 'hydra_v1',
     # 'hydra_scalar_v1',
     # 'hydra_unet_v0',
     # 'hydra_v2',
-    'simple_cnn',
+    # 'simple_cnn',
     # 'hydra_scalar_v2'
 ]
 
 FEATURE_NAMES = [
-    'boundary_edge_surface',
+    # 'boundary_edge_surface',
     # 'boundary_surface',
     # 'boundary_edge',
     # 'surface_edge',
-    # 'boundary',
+    'boundary',
     # 'surface',
     # 'edge'
 ]
@@ -56,7 +54,8 @@ def train(job_name, feature_name, model_name):
         ' --job-name={}'
         ' --feature-name={}'
         ' --path-tfrecords={}'
-    ).format(model_name, job_name, feature_name, path_tfrecords)
+        ' --learning-rate={}'
+    ).format(model_name, job_name, feature_name, path_tfrecords, 1e-3)
 
     os.system(command)
 

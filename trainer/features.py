@@ -1,9 +1,8 @@
-import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.interpolate import NearestNDInterpolator
 import pandas as pd
 
-from trainer.util import *
+from trainer.utils.util import *
 from trainer.names import *
 
 

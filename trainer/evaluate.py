@@ -1,9 +1,7 @@
 import argparse
 
-from tensorflow import keras
-
 from trainer.data import *
-from trainer.util import *
+from trainer.utils.util import *
 from trainer.names import *
 
 

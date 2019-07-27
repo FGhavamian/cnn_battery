@@ -1,14 +1,7 @@
-import pickle
-import argparse
-
-import tensorflow as tf
-from tensorflow import keras
 from scipy.interpolate import NearestNDInterpolator
-from scipy.interpolate import LinearNDInterpolator
-from scipy.interpolate import CloughTocher2DInterpolator
 
 from trainer.preprocess import PreprocessBatch
-from trainer.util import *
+from trainer.utils.util import *
 
 
 def extract_case_name(path_mesh):
@@ -25,7 +18,7 @@ def extract_feature_name(path_stats):
 
 
 class Predictor:
-    def __init__(self, path_model, path_stats, do_write2vtk=True):
+    def __init__(self, path_model, path_stats, do_write2vtk=True, preprocess_path=None):
         """
 
         Args:
@@ -43,6 +36,7 @@ class Predictor:
         self.pp = self.__get_preprocessor(path_stats)
 
         self.do_write2vtk = do_write2vtk
+        self.preprocess_path = preprocess_path
 
     def __call__(self, names, paths_mesh, paths_vtu=None, pre_mode=''):
         """
@@ -61,25 +55,27 @@ class Predictor:
         pred = self.__make_prediction(inputs)
         pred = self.__destandardize_prediction(pred)
         pred = self.__mask_pred(pred, inputs['mask'])
-        pred = self.__to_nodes(pred)
+        # pred = self.__to_nodes(pred)
+        #
+        # if self.do_write2vtk and paths_vtu:
+        #     ref = self.__destandardize_prediction(self.pp.y)
+        #     ref = self.__to_nodes(ref)
+        #
+        #     def err_func(a, b):
+        #         return np.abs(a - b) / np.linalg.norm(b, axis=0, keepdims=True)
+        #
+        #     err = {name: err_func(pred[name], ref[name]) for name in names}
+        #
+        #     for name in names:
+        #         self.__write2vtk(pred[name], case_name=name, mode='pred', pre_mode=pre_mode)
+        #
+        #         if paths_vtu:
+        #             self.__write2vtk(ref[name], case_name=name, mode='ref', pre_mode=pre_mode)
+        #             self.__write2vtk(err[name], case_name=name, mode='err', pre_mode=pre_mode)
 
-        if self.do_write2vtk and paths_vtu:
-            ref = self.__destandardize_prediction(self.pp.y)
-            ref = self.__to_nodes(ref)
+        y = self.__destandardize_prediction(self.pp.y)
 
-            def err_func(a, b):
-                return np.abs(a - b) / np.linalg.norm(b, axis=0, keepdims=True)
-
-            err = {name: err_func(pred[name], ref[name]) for name in names}
-
-            for name in names:
-                self.__write2vtk(pred[name], case_name=name, mode='pred', pre_mode=pre_mode)
-
-                if paths_vtu:
-                    self.__write2vtk(ref[name], case_name=name, mode='ref', pre_mode=pre_mode)
-                    self.__write2vtk(err[name], case_name=name, mode='err', pre_mode=pre_mode)
-
-        return pred
+        return pred, y, self.pp
 
     def __write2vtk(self, pred, case_name, mode, pre_mode):
         node_coord = self.pp.mesh_data[case_name]['coord']
@@ -129,8 +125,14 @@ class Predictor:
         return dict(feature=self.pp.x, mask=self.pp.mask)
 
     def __compile_preprocessor(self, names, paths_mesh, paths_vtu):
-        self.pp.populate(names, paths_mesh, paths_vtu)
-        self.pp.compile()
+        if os.path.exists(self.preprocess_path):
+            with open(self.preprocess_path, 'rb') as file:
+                self.pp = pickle.load(file)
+        else:
+            self.pp.populate(names, paths_mesh, paths_vtu)
+            self.pp.compile()
+            with open(self.preprocess_path, 'wb') as file:
+                pickle.dump(self.pp, file)
 
     def __get_preprocessor(self, path_stats):
         return PreprocessBatch(is_train=False, path_output=path_stats, feature_name=self.feature_name)

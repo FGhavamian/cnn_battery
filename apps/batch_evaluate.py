@@ -1,9 +1,6 @@
-import os
-import glob
-
 import pandas as pd
 
-from trainer.util import *
+from trainer.utils.util import *
 
 MODEL_NAME = 'hydra_v2'
 FEATURE_NAME = 'boundary_edge_surface'

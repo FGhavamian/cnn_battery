@@ -1,7 +1,4 @@
-import os
-import glob
-
-from trainer.util import *
+from trainer.utils.util import *
 
 
 def _make_features():
@@ -40,7 +37,9 @@ def _parser(serialized_example):
 
 
 def make_dataset(path_tfrecords, batch_size, mode):
+    print(path_tfrecords)
     path = glob.glob(os.path.join(path_tfrecords, mode + '_*.tfrecords'))
+    print(path)
 
     dataset = tf.data.TFRecordDataset(path)
 
@@ -56,14 +55,15 @@ def make_dataset(path_tfrecords, batch_size, mode):
 
 
 if __name__ == '__main__':
-    ds = make_dataset('data/processed/boundary_surface_edge/tfrecords', 128, 'train')
+    ds = make_dataset('data/processed/boundary/tfrecords', 128, 'train')
 
     d, _ = ds.make_one_shot_iterator().get_next()
     d = d['feature']
     with tf.Session() as sess:
         try:
             d = sess.run(d)
-            print(d[0,0,0,:])
+            print(d.shape)
+            print(d[0, 0, 0,:])
         except tf.errors.OutOfRangeError:
             print('eof')
     # print(b.shape)

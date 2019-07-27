@@ -1,53 +1,19 @@
 import argparse
 import json
+import os
 
-from tensorflow import keras
+from tensorflow.python.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
+from tensorflow.python.keras.optimizers import Adam
 
-from trainer.model import *
-from trainer.data import *
-from trainer.names import *
-
-
-class PrettyLogger(keras.callbacks.Callback):
-    def __init__(self, display):
-        super().__init__()
-        self.display = display
-        self.logs_old = None
-
-    def on_epoch_end(self, epoch, logs=None):
-        if epoch % self.display == 0:
-            self.print_all(epoch, logs)
-        else:
-            self.print_some(epoch, logs)
-
-    def print_all(self, epoch, logs):
-        print('\n\n{}/{}'.format(epoch, self.params['epochs']))
-
-        if not self.logs_old:
-            self.logs_old = logs
-
-        # metrics = [m for m in self.params['metrics'] if 'val' not in m]
-        # for metric in metrics:
-        #     print('\t{:<15} {:<15.3f} -> {:<20.3f} {:<20} {:<15.3f} -> {:<20.3f}'.format(
-        #         metric, self.logs_old[metric], logs[metric],
-        #         'val_' + metric, self.logs_old['val_' + metric], logs['val_' + metric]
-        #     ))
-
-        for metric in self.params['metrics']:
-            print('\t{:<15} {:<15.3f} -> {:<20.3f}'.format(
-                metric, self.logs_old[metric], logs[metric])
-            )
-
-        self.logs_old = logs
-
-        print()
-
-    def print_some(self, epoch, logs):
-        print('{}/{} -- loss {}'.format(epoch, self.params['epochs'], logs['loss']), end='\r')
+from trainer.model import get_model
+from trainer.data import make_dataset
+from trainer.names import FEATURE_TO_DIM
+from trainer.utils.callbacks import PrettyLogger
+from trainer.utils import make_metrics
 
 
 def get_callbacks(monitor, mode, args):
-    chp = keras.callbacks.ModelCheckpoint(
+    chp = ModelCheckpoint(
         filepath=os.path.join(args.path_output, "model.h5"),
         monitor=monitor,
         save_best_only=True,
@@ -55,51 +21,57 @@ def get_callbacks(monitor, mode, args):
         period=args.epoch_num // 100,
         verbose=1)
 
-    es = keras.callbacks.EarlyStopping(
-        monitor=monitor,
-        patience=args.epoch_num // 1000,
-        min_delta=1e-5,
-        mode=mode,
-        verbose=1)
+    # es = EarlyStopping(
+    #     monitor=monitor,
+    #     patience=args.epoch_num // 1000,
+    #     min_delta=1e-5,
+    #     mode=mode,
+    #     verbose=1)
 
-    tb = keras.callbacks.TensorBoard(
+    tb = TensorBoard(
         log_dir=os.path.join(args.path_output, "graph"),
         histogram_freq=0,
         write_graph=True,
         write_grads=False)
 
-    rlr = keras.callbacks.ReduceLROnPlateau(
+    rlr = ReduceLROnPlateau(
         monitor=monitor,
         factor=0.5,
-        patience=args.learning_rate // 2000,
+        patience=args.epoch_num // 10,
         min_lr=1e-5,
         mode=mode,
-        min_delta=1e-4,
+        min_delta=1e-2,
         verbose=1)
 
-    return [chp, tb, rlr, PrettyLogger(display=5)]
+    pl = PrettyLogger(display=5)
+
+    return [chp, tb, rlr, pl]
 
 
 def train(args):
     dataset_train = make_dataset(
         args.path_tfrecords,
-        batch_size=128, mode='train')
+        batch_size=16, mode='train')
+
+    dataset_test = make_dataset(
+        args.path_tfrecords,
+        batch_size=16, mode='test')
 
     feature_dim = sum([FEATURE_TO_DIM[f] for f in args.feature_name.split('_')])
 
     model = get_model(args.model_name, feature_dim=feature_dim)
 
     model.compile(
-        keras.optimizers.Adam(lr=args.learning_rate),
+        Adam(lr=args.learning_rate),
         loss='mse',
         metrics=make_metrics())
 
     model.fit(
         x=dataset_train,
         epochs=args.epoch_num,
-        # validation_data=dataset_val,
-        steps_per_epoch=1,
-        # validation_steps=1,
+        validation_data=dataset_test,
+        steps_per_epoch=10,
+        validation_steps=10,
         verbose=0,
         callbacks=get_callbacks(
             monitor='loss',
@@ -155,7 +127,7 @@ if __name__ == '__main__':
         '--learning-rate',
         help='rate of learning',
         type=float,
-        default=1e-4)
+        default=1e-3)
 
     args = parser.parse_args()
 
