@@ -11,6 +11,9 @@ from trainer.names import FEATURE_TO_DIM
 from trainer.utils.callbacks import PrettyLogger
 from trainer.utils import make_metrics
 
+TRAIN_NUM = 40
+TEST_NUM = 10
+
 
 def get_callbacks(monitor, mode, args):
     chp = ModelCheckpoint(
@@ -43,7 +46,7 @@ def get_callbacks(monitor, mode, args):
         min_delta=1e-2,
         verbose=1)
 
-    pl = PrettyLogger(display=5)
+    pl = PrettyLogger(display=20)
 
     return [chp, tb, rlr, pl]
 
@@ -51,11 +54,11 @@ def get_callbacks(monitor, mode, args):
 def train(args):
     dataset_train = make_dataset(
         args.path_tfrecords,
-        batch_size=16, mode='train')
+        batch_size=args.batch_size, mode='train')
 
     dataset_test = make_dataset(
         args.path_tfrecords,
-        batch_size=16, mode='test')
+        batch_size=args.batch_size, mode='test')
 
     feature_dim = sum([FEATURE_TO_DIM[f] for f in args.feature_name.split('_')])
 
@@ -70,8 +73,8 @@ def train(args):
         x=dataset_train,
         epochs=args.epoch_num,
         validation_data=dataset_test,
-        steps_per_epoch=10,
-        validation_steps=10,
+        steps_per_epoch=max(1, TRAIN_NUM//args.batch_size),
+        validation_steps=max(1, TEST_NUM//args.batch_size),
         verbose=0,
         callbacks=get_callbacks(
             monitor='loss',
@@ -120,7 +123,7 @@ if __name__ == '__main__':
         '--epoch-num',
         help='max number of epochs',
         type=int,
-        default=2000
+        default=1000
     )
 
     parser.add_argument(
@@ -129,11 +132,25 @@ if __name__ == '__main__':
         type=float,
         default=1e-3)
 
+    parser.add_argument(
+        '--ex-path',
+        help='example number which is used in the path of output file',
+        default='test'
+    )
+
+    parser.add_argument(
+        '--batch-size',
+        help='batch size',
+        type=int,
+        default=16
+    )
+
     args = parser.parse_args()
 
-    args.path_output = os.path.join('output', args.model_name, args.feature_name, args.job_name)
+    args.path_output = os.path.join(args.ex_path, args.job_name)
     make_output_directory(args.path_output)
 
     write_hparams_to_file(args)
 
+    print(f'[INFO] training example at {args.path_output}')
     train(args)

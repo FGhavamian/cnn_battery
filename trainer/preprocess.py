@@ -105,17 +105,17 @@ class PreprocessBatch(DataHolder):
         self.grid = self._get_grid(self.is_train)
         self.mask = self._make_mask()
 
-        print('\t[INFO] encoding geometry ...')
+        print('[INFO] encoding geometry ...')
         features = self._encode_geometry()
         targets = {name: data['solutions'] for name, data in self.vtu_data.items()}
 
-        print('\t[INFO] interpolating features ...')
+        print('[INFO] interpolating features ...')
 
         self.x = self._interpolate(features, self.grid['grid'], self.mesh_data)
         self.x = self._standardize('x', self.x)
 
         if self.vtu_data:
-            print('\t[INFO] interpolating solutions ...')
+            print('[INFO] interpolating solutions ...')
             self.y = self._interpolate(targets, self.grid['grid'], self.vtu_data)
             self.y = self._standardize('y', self.y)
 
@@ -212,7 +212,8 @@ class PreprocessBatch(DataHolder):
             grid_fields = grid_fields.reshape(*self.grid['dim'] + (-1,))
             return grid_fields
 
-        fields_on_grid = Parallel(n_jobs=8, prefer="threads")(delayed(interpolator)(case_name) for case_name in tqdm(fields_dict.keys()))
+        fields_on_grid = Parallel(n_jobs=8, prefer="threads")(delayed(interpolator)(case_name)
+                                                              for case_name in tqdm(fields_dict.keys()))
         fields_on_grid = np.stack(fields_on_grid, axis=0)
         fields_on_grid = fields_on_grid.astype(np.float32)
 

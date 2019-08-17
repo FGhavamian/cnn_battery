@@ -40,62 +40,45 @@ class FeatureMaker:
 
 class FeatureMakerEdge:
     def __init__(self, mesh_data):
-        raise NotImplementedError(f'{self.__class__.__name__} is not implemented')
         self.mesh_data = mesh_data
-        self.node_coord = mesh_data['coord']
 
     def __call__(self):
-        features = []
-        # for _, boundary_node in self.mesh_data["groups_node"].items():
-        for boundary_name in BOUNDARY_NAMES:
-            boundary_node = self.mesh_data["groups_node"][boundary_name]
+        df_features = pd.DataFrame()
 
-            boundary_node_encoding = np.zeros(self.node_coord.shape[0], dtype=np.float32)
-            boundary_node_encoding[boundary_node] = 1.0
+        for boundary_name, boundary_nodes in self.mesh_data['groups_nodes'].items():
+            boundary_node_encoding = np.zeros(self.mesh_data['coord'].shape[0], dtype=np.float32)
+            boundary_node_encoding[boundary_nodes] = 1.0
 
-            f = NearestNDInterpolator(self.node_coord, boundary_node_encoding)
-            surface_grid_encoding = f(self.grid_coord)
+            df_features[boundary_name] = boundary_node_encoding
 
-            features += [surface_grid_encoding]
-
-        return np.stack(features, axis=1)
+        return df_features
 
 
 class FeatureMakerSurface:
-    def __init__(self, grid_coord, mesh_data):
-        raise NotImplementedError(f'{self.__class__.__name__} is not implemented')
-        self.grid_coord = grid_coord
+    def __init__(self, mesh_data):
         self.mesh_data = mesh_data
-        self.node_coord = mesh_data['coord']
 
     def __call__(self):
-        features = []
-        # for _, surface_node in self.mesh_data['groups_element_nodes'].items():
-        for surface_name in SURFACE_NAMES:
-            surface_node = self.mesh_data["groups_element_nodes"][surface_name]
+        df_features = pd.DataFrame()
 
-            surface_node_encoding = np.zeros(self.node_coord.shape[0], dtype=np.float32)
-            surface_node_encoding[surface_node] = 1.0
+        for surface_name, surface_nodes in self.mesh_data['groups_element_nodes'].items():
+            surface_node_encoding = np.zeros(self.mesh_data['coord'].shape[0], dtype=np.float32)
+            surface_node_encoding[surface_nodes] = 1.0
 
-            f = NearestNDInterpolator(self.node_coord, surface_node_encoding)
-            surface_grid_encoding = f(self.grid_coord)
+            df_features[surface_name] = surface_node_encoding
 
-            features += [surface_grid_encoding]
-
-        return np.stack(features, axis=1)
+        return df_features
 
 
 class FeatureMakerBoundary:
     def __init__(self, mesh_data):
         self.mesh_data = mesh_data
-        # self.mesh_data = mesh_data
-        # self.node_coord = mesh_data['coord']
 
     def __call__(self):
         df_features = pd.DataFrame()
 
-        for group, some_nodes in self.mesh_data['groups_nodes'].items():
-            some_coord = self.mesh_data['coord'][some_nodes]
+        for group, boundary_nodes in self.mesh_data['groups_nodes'].items():
+            some_coord = self.mesh_data['coord'][boundary_nodes]
             dist_node_to_boundary = cdist(self.mesh_data['coord'], some_coord)
 
             dist_node_to_boundary = np.min(dist_node_to_boundary, axis=1)
@@ -104,20 +87,6 @@ class FeatureMakerBoundary:
             df_features[group] = dist_node_to_boundary
 
         return df_features
-
-        # for _, boundary_node in self.mesh_data["groups_node"].items():
-        # for boundary_name in BOUNDARY_NAMES:
-        #     boundary_node = self.mesh_data["groups_node"][boundary_name]
-        #
-        #     boundary_node_coord = self.get_coord_of(boundary_node)
-        #
-        #     boundary_node_to_grid_dist = self.closest_distance_to(boundary_node_coord)
-        #
-        #     boundary_feature = self.dist_radial(boundary_node_to_grid_dist)
-        #
-        #     features += [boundary_feature]
-        #
-        # return np.stack(features, axis=1)
 
     @staticmethod
     def dist_radial(x):
@@ -157,6 +126,6 @@ if __name__ == '__main__':
          [2, 2.5]]
     )
 
-    f = FeatureMaker(grid_coord, mesh_data, 'edge')()
+    f = FeatureMaker(mesh_data, 'surface')()
 
     print(f)

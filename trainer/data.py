@@ -55,7 +55,9 @@ def make_dataset(path_tfrecords, batch_size, mode):
 
 
 if __name__ == '__main__':
-    ds = make_dataset('data/processed/boundary/tfrecords', 128, 'train')
+    import matplotlib.pyplot as plt
+
+    ds = make_dataset('data/processed/boundary_edge_surface/tfrecords', 128, 'train')
 
     d, _ = ds.make_one_shot_iterator().get_next()
     d = d['feature']
@@ -64,6 +66,10 @@ if __name__ == '__main__':
             d = sess.run(d)
             print(d.shape)
             print(d[0, 0, 0,:])
+            for i in range(0, d.shape[3]):
+                plt.figure()
+                plt.imshow(d[13, :, :, i])
+            plt.show()
         except tf.errors.OutOfRangeError:
             print('eof')
     # print(b.shape)

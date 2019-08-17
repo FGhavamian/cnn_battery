@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 from trainer.predict import Predictor
 from trainer.utils.util import *
 
-PATH_JOB = 'output/hydra_v0/boundary/cnn_20190727_095347'
+# PATH_JOB = 'output/hydra_v0/boundary/cnn_20190727_095347'
+# PATH_JOB = 'output/hydra_v1/boundary/cnn_20190727_203153'
+PATH_JOB = 'output/hydra_v2/boundary/cnn_20190728_094050'
 PATH_MODEL = PATH_JOB + '/model.h5'
 PATH_DATA_PROCESSED = 'data/processed/boundary'
 PATH_DATA_RAW = 'data/raw/ex2'

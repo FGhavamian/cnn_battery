@@ -647,6 +647,12 @@ def read_json(file_path):
 
 
 def write_json(file_path, data):
+    # all float values should be that of float64 so that json can serialize it
+    if isinstance(data[list(data.keys())[0]], dict):
+        for k in data:
+            for k1 in data[k]:
+                data[k][k1] = np.float64(data[k][k1])
+
     with open(file_path, 'w') as file:
         json.dump(data, file, indent=4, ensure_ascii=False)
 

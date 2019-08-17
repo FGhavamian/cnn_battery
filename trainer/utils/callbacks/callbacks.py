@@ -27,7 +27,7 @@ class PrettyLogger(Callback):
         #     ))
 
         for metric in self.params['metrics']:
-            print('\t{:<15} {:<15.3f} -> {:<20.3f}'.format(
+            print('\t{:<30} {:<5.3f} -> {:<10.3f}'.format(
                 metric, self.logs_old[metric], logs[metric])
             )
 
