@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 
-from tensorflow.python.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
+from tensorflow.python.keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau
 from tensorflow.python.keras.optimizers import Adam
 
 from trainer.model import get_model

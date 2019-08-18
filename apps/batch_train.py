@@ -3,16 +3,18 @@ import os
 
 from trainer.utils.util import *
 
-EXAMPLE_NAME = 'feature_selection'
+EXAMPLE_NAME = 'params'
 
 NUM_TESTS = 5
 EPOCH_NUM = 500
 
 MODEL_NAMES = [
-    'hydra_v0',
+    # 'hydra_v0',
     # 'hydra_v01',
     # 'hydra_scalar_v0',
-    # 'hydra_v1',
+    'hydra_v1',
+    'hydra_v01',
+    'hydra_v001',
     # 'hydra_scalar_v1',
     # 'hydra_unet_v0',
     # 'hydra_v2',
@@ -22,12 +24,12 @@ MODEL_NAMES = [
 
 FEATURE_NAMES = [
     'boundary_edge_surface',
-    'boundary_surface',
-    'boundary_edge',
-    'surface_edge',
-    'boundary',
-    'surface',
-    'edge'
+    # 'boundary_surface',
+    # 'boundary_edge',
+    # 'surface_edge',
+    # 'boundary',
+    # 'surface',
+    # 'edge'
 ]
 
 LEARNING_RATES = [

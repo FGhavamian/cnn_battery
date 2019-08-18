@@ -1,14 +1,13 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+
 import pandas as pd
 
 from trainer.utils.util import *
 
-EXAMPLE_NAME = 'feature_selection'
-MODEL_NAME = 'hydra_v0'
-FEATURE_NAME = 'boundary'
+EXAMPLE_NAME = 'params'
 
-# DIR_TFRECORDS = os.path.join('data', 'processed', FEATURE_NAME, 'tfrecords')
 DIR_EXAMPLES = os.path.join('output', EXAMPLE_NAME)
-# DIR_MODELS = os.path.join('output', EXAMPLE_NAME, '0.01', MODEL_NAME, FEATURE_NAME)
 
 
 def evaluate():
@@ -24,8 +23,7 @@ def evaluate():
                 ' --path-model={}'
                 ' --dir-tfrecords={}'
             ).format(path_model, dir_tfrecords)
-            # os.system(command)
-
+            os.system(command)
 
     for path_case in path_cases:
         path_scores = glob.glob(os.path.join(path_case, 'cnn_*', 'score.json'))
