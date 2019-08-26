@@ -57,7 +57,7 @@ def make_dataset(path_tfrecords, batch_size, mode):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    ds = make_dataset('data/processed/boundary_edge_surface/tfrecords', 128, 'train')
+    ds = make_dataset('data/processed/boundary_edge_surface_0.25/tfrecords', 2, 'train')
 
     d, _ = ds.make_one_shot_iterator().get_next()
     d = d['feature']

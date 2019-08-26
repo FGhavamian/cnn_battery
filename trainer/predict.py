@@ -31,30 +31,69 @@ class Predictor:
         self.feature_name = extract_feature_name(path_stats)
         self.model_name = extract_model_name(path_model)
 
-        self.model = self.__load_model(path_model)
-        self.stats = self.__load_stats(path_stats)
-        self.pp = self.__get_preprocessor(path_stats)
+        self.model = self._load_model(path_model)
+        self.stats = self._load_stats(path_stats)
+        self.pp = self._get_preprocessor(path_stats)
 
         self.do_write2vtk = do_write2vtk
         self.preprocess_path = preprocess_path
 
     def __call__(self, names, paths_mesh, paths_vtu=None, pre_mode=''):
-        """
+        self._compile_preprocessor(names, paths_mesh, paths_vtu)
 
-        Args:
-            paths_mesh ():
-            paths_vtu (): if path_vtu is provided, then the model is evaluated and error is saved in a vtu file
+        inputs = self._get_inputs()
 
-        Returns:
+        pred = self._make_prediction(inputs)
+        pred = self._destandardize_prediction(pred)
+        pred = self._mask_pred(pred, inputs['mask'])
 
-        """
-        self.__compile_preprocessor(names, paths_mesh, paths_vtu)
+        y = self._destandardize_prediction(self.pp.y)
 
-        inputs = self.__get_inputs()
+        sig_vm = {
+            'y': self._compute_vm_stress(y),
+            'pred': self._compute_vm_stress(pred)
+        }
 
-        pred = self.__make_prediction(inputs)
-        pred = self.__destandardize_prediction(pred)
-        pred = self.__mask_pred(pred, inputs['mask'])
+        i_m = {
+            'y': self._compute_elec_current_density_intensity(y),
+            'pred': self._compute_elec_current_density_intensity(pred)
+        }
+
+        c = {
+            'y': self._compute_ion_concentration(y),
+            'pred': self._compute_ion_concentration(pred)
+        }
+
+        fields = {
+            'y': y,
+            'pred': pred
+        }
+
+        return fields, sig_vm, i_m, c, self.pp
+
+    @staticmethod
+    def _compute_vm_stress(fields):
+        sig_xx = fields[:, :, :, 3]
+        sig_yy = fields[:, :, :, 4]
+        sig_zz = fields[:, :, :, 5]
+        sig_xy = fields[:, :, :, 6]
+
+        sig_vm = np.sqrt(0.5*((sig_xx-sig_yy)**2 + (sig_xx-sig_zz)**2 + (sig_yy-sig_zz)**2 + 6*sig_xy**2))
+        return sig_vm
+
+    @staticmethod
+    def _compute_elec_current_density_intensity(fields):
+        i_x = fields[:, :, :, 8]
+        i_y = fields[:, :, :, 9]
+
+        i_m = np.sqrt(i_x**2 + i_y**2)
+        return i_m
+
+    @staticmethod
+    def _compute_ion_concentration(fields):
+        c = fields[:, :, :, -3]
+        return c
+
         # pred = self.__to_nodes(pred)
         #
         # if self.do_write2vtk and paths_vtu:
@@ -73,58 +112,55 @@ class Predictor:
         #             self.__write2vtk(ref[name], case_name=name, mode='ref', pre_mode=pre_mode)
         #             self.__write2vtk(err[name], case_name=name, mode='err', pre_mode=pre_mode)
 
-        y = self.__destandardize_prediction(self.pp.y)
 
-        return pred, y, self.pp
+    # def _write2vtk(self, pred, case_name, mode, pre_mode):
+    #     node_coord = self.pp.mesh_data[case_name]['coord']
+    #     element_connect = self.pp.mesh_data[case_name]['element_connect']
+    #
+    #     feature_name = '_'.join(self.feature_name)
+    #
+    #     report_dir = os.path.join('report', self.model_name, feature_name, pre_mode + '_' + case_name)
+    #
+    #     if not os.path.exists(report_dir):
+    #         os.makedirs(report_dir)
+    #
+    #     write_vtu = VtuWriter(
+    #         report_dir=report_dir,
+    #         file_name=mode + '_' + case_name,
+    #         coord=node_coord,
+    #         connect=element_connect,
+    #         pred=pred
+    #     )
+    #
+    #     write_vtu()
 
-    def __write2vtk(self, pred, case_name, mode, pre_mode):
-        node_coord = self.pp.mesh_data[case_name]['coord']
-        element_connect = self.pp.mesh_data[case_name]['element_connect']
+    # def _to_nodes(self, pred_on_grid):
+    #     preds_on_grid = np.vsplit(pred_on_grid, pred_on_grid.shape[0])
+    #
+    #     case_names = list(self.pp.mesh_data.keys())
+    #     pred_on_node = {case_name: None for case_name in case_names}
+    #
+    #     for case_idx, pred_on_grid in enumerate(preds_on_grid):
+    #         case_name = case_names[case_idx]
+    #         node_coord = self.pp.mesh_data[case_name]['coord']
+    #
+    #         pred_on_grid = np.reshape(pred_on_grid, [-1, pred_on_grid.shape[-1]])
+    #
+    #         f = NearestNDInterpolator(self.pp.grid['grid'], pred_on_grid)
+    #
+    #         pred_on_node[case_name] = f(node_coord)
+    #
+    #     return pred_on_node
 
-        feature_name = '_'.join(self.feature_name)
-
-        report_dir = os.path.join('report', self.model_name, feature_name, pre_mode + '_' + case_name)
-
-        if not os.path.exists(report_dir):
-            os.makedirs(report_dir)
-
-        write_vtu = VtuWriter(
-            report_dir=report_dir,
-            file_name=mode + '_' + case_name,
-            coord=node_coord,
-            connect=element_connect,
-            pred=pred
-        )
-
-        write_vtu()
-
-    def __to_nodes(self, pred_on_grid):
-        preds_on_grid = np.vsplit(pred_on_grid, pred_on_grid.shape[0])
-
-        case_names = list(self.pp.mesh_data.keys())
-        pred_on_node = {case_name: None for case_name in case_names}
-
-        for case_idx, pred_on_grid in enumerate(preds_on_grid):
-            case_name = case_names[case_idx]
-            node_coord = self.pp.mesh_data[case_name]['coord']
-
-            pred_on_grid = np.reshape(pred_on_grid, [-1, pred_on_grid.shape[-1]])
-
-            f = NearestNDInterpolator(self.pp.grid['grid'], pred_on_grid)
-
-            pred_on_node[case_name] = f(node_coord)
-
-        return pred_on_node
-
-    def __make_prediction(self, inputs):
+    def _make_prediction(self, inputs):
         output = self.model.predict(inputs, steps=1)
 
         return output
 
-    def __get_inputs(self):
+    def _get_inputs(self):
         return dict(feature=self.pp.x, mask=self.pp.mask)
 
-    def __compile_preprocessor(self, names, paths_mesh, paths_vtu):
+    def _compile_preprocessor(self, names, paths_mesh, paths_vtu):
         if os.path.exists(self.preprocess_path):
             with open(self.preprocess_path, 'rb') as file:
                 self.pp = pickle.load(file)
@@ -134,26 +170,26 @@ class Predictor:
             with open(self.preprocess_path, 'wb') as file:
                 pickle.dump(self.pp, file)
 
-    def __get_preprocessor(self, path_stats):
+    def _get_preprocessor(self, path_stats):
         return PreprocessBatch(is_train=False, path_output=path_stats, feature_name=self.feature_name)
 
     @staticmethod
-    def __load_model(path_model):
+    def _load_model(path_model):
         return keras.models.load_model(
             filepath=path_model,
             custom_objects={func.__name__: func for func in make_metrics()})
 
     @staticmethod
-    def __load_stats(path_data):
+    def _load_stats(path_data):
         with open(os.path.join(path_data, 'stats_y.pkl'), 'rb') as file:
             return pickle.load(file)
         # return np.load(os.path.join(path_data, 'stats_y.npy'))
 
-    def __destandardize_prediction(self, pred):
+    def _destandardize_prediction(self, pred):
         return pred * self.stats["std"] + self.stats["mean"]
 
     @staticmethod
-    def __mask_pred(pred, mask):
+    def _mask_pred(pred, mask):
         return pred * mask
 
 

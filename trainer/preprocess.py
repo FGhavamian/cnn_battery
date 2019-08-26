@@ -1,4 +1,5 @@
 import argparse
+import random
 
 from sklearn.model_selection import train_test_split
 from scipy.spatial import Delaunay
@@ -424,8 +425,8 @@ class Tfrecords:
             name=bytes_feature(name))
 
 
-def make_output_dir(path_output, features):
-    path_output = os.path.join(path_output, '_'.join(features))
+def make_output_dir(path_output, features, train_data_percentage):
+    path_output = os.path.join(path_output, '_'.join(features + [str(train_data_percentage)]))
     if not os.path.exists(path_output):
         os.makedirs(path_output)
         return path_output
@@ -465,11 +466,21 @@ if __name__ == '__main__':
         default=os.path.join('data', 'processed')
     )
 
+    parser.add_argument(
+        '--train-data-percentage', '-tdp',
+        help='percentage of data to use for training',
+        type=float,
+        default=1.0
+    )
+
     args = parser.parse_args()
-    args.path_output = make_output_dir(args.path_output, args.features)
+    args.path_output = make_output_dir(args.path_output, args.features, args.train_data_percentage)
 
     print('[INFO] reading mesh and vtu files ...')
     names_train, names_test, paths_mesh, paths_vtu = get_train_val_test_paths(args.path_data)
+
+    names_train = random.sample(names_train, int(len(names_train)*args.train_data_percentage))
+    print(f'Size of training set: {len(names_train)}')
 
     pp_train = PreprocessBatch(is_train=True, path_output=args.path_output, feature_name=args.features)
     pp_test = PreprocessBatch(is_train=False, path_output=args.path_output, feature_name=args.features)

@@ -5,13 +5,13 @@ import pandas as pd
 
 from trainer.utils.util import *
 
-EXAMPLE_NAME = 'params'
+EXAMPLE_NAME = 'data_size'
 
 DIR_EXAMPLES = os.path.join('output', EXAMPLE_NAME)
 
 
 def evaluate():
-    path_cases = glob.glob(os.path.join(DIR_EXAMPLES, '*', '*', '*'))
+    path_cases = glob.glob(os.path.join(DIR_EXAMPLES, '*', '*', '*', '*'))
 
     for path_case in path_cases:
         path_models = glob.glob(os.path.join(path_case, 'cnn_*', 'model.h5'))
