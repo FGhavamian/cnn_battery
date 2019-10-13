@@ -49,6 +49,8 @@ class Predictor:
 
         y = self._destandardize_prediction(self.pp.y)
 
+        geom_fields = inputs
+
         sig_vm = {
             'y': self._compute_vm_stress(y),
             'pred': self._compute_vm_stress(pred)
@@ -69,7 +71,7 @@ class Predictor:
             'pred': pred
         }
 
-        return fields, sig_vm, i_m, c, self.pp
+        return geom_fields, fields, sig_vm, i_m, c, self.pp
 
     @staticmethod
     def _compute_vm_stress(fields):

@@ -317,6 +317,6 @@ def simple_cnn(feature_dim):
 if __name__ == '__main__':
     from tensorflow.python.keras.utils import plot_model
 
-    plot_model(simple_cnn(15), to_file='model.png')
+    plot_model(hydra_v0(12), to_file='model.png')
 
-    # print(cnn_v6(feature_dim=15).summary())
+    print(hydra_v2(feature_dim=27).summary())
