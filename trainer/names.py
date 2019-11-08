@@ -36,9 +36,9 @@ PHYSICAL_DIMS_SCALAR['li_flux_1'] = 1
 TARGET_DIM = sum([SOLUTION_DIMS[name] for name in SOLUTION_DIMS])
 
 FEATURE_TO_DIM = dict(
-    boundary=12,
+    boundary=10,
     surface=3,
-    edge=12,
+    edge=10,
 )
 
 BOUNDARY_NAMES = [
@@ -50,10 +50,10 @@ BOUNDARY_NAMES = [
     'rightEdgeSPE',
     'rightEdgeCathode',
     'yTop',
-    'intCatElCathode',
+    # 'intCatElCathode',
     'intCatElSPE',
     'intAnElSPE',
-    'intAnElAnode'
+    # 'intAnElAnode'
 ]
 
 SURFACE_NAMES = [

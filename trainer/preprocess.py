@@ -1,13 +1,21 @@
 import argparse
 import random
+import os
+import glob
+import pickle
 
 from sklearn.model_selection import train_test_split
 from scipy.spatial import Delaunay
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 from joblib import Parallel, delayed
+import tensorflow as tf
 
-from trainer.utils.util import *
+from trainer.utils.parsers import read_mesh, read_vtu
+from trainer.utils.util import (to_float32, load_from_pickle, save_to_pickle,
+                                bytes_feature, int64_feature, numpy_to_bytes,
+                                chunks, write_json)
 from trainer.features import FeatureMaker
 from trainer.names import *
 
@@ -96,7 +104,7 @@ class PreprocessBatch(DataHolder):
         self.x_names = None
         # self.y_names = None
 
-    def compile(self):
+    def compile(self, do_standardize=True):
         if not self.mesh_data:
             raise (Exception('Set mesh first!'))
 
@@ -107,18 +115,20 @@ class PreprocessBatch(DataHolder):
         self.mask = self._make_mask()
 
         print('[INFO] encoding geometry ...')
-        features = self._encode_geometry()
-        targets = {name: data['solutions'] for name, data in self.vtu_data.items()}
+        self.x_mesh = self._encode_geometry()
+        self.y_mesh = {name: data['solutions'] for name, data in self.vtu_data.items()}
 
         print('[INFO] interpolating features ...')
 
-        self.x = self._interpolate(features, self.grid['grid'], self.mesh_data)
-        self.x = self._standardize('x', self.x)
+        self.x = self._interpolate(self.x_mesh, self.grid['grid'], self.mesh_data)
+        if do_standardize:
+            self.x = self._standardize('x', self.x)
 
         if self.vtu_data:
             print('[INFO] interpolating solutions ...')
-            self.y = self._interpolate(targets, self.grid['grid'], self.vtu_data)
-            self.y = self._standardize('y', self.y)
+            self.y = self._interpolate(self.y_mesh, self.grid['grid'], self.vtu_data)
+            if do_standardize:
+                self.y = self._standardize('y', self.y)
 
         self.compiled = True
 
@@ -213,9 +223,10 @@ class PreprocessBatch(DataHolder):
             grid_fields = grid_fields.reshape(*self.grid['dim'] + (-1,))
             return grid_fields
 
-        fields_on_grid = Parallel(n_jobs=8, prefer="threads")(delayed(interpolator)(case_name)
+        fields_grid_list = Parallel(n_jobs=3, prefer="threads")(delayed(interpolator)(case_name)
                                                               for case_name in tqdm(fields_dict.keys()))
-        fields_on_grid = np.stack(fields_on_grid, axis=0)
+
+        fields_on_grid = np.stack(fields_grid_list, axis=0)
         fields_on_grid = fields_on_grid.astype(np.float32)
 
         return fields_on_grid

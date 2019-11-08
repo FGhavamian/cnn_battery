@@ -2,10 +2,9 @@ import argparse
 import json
 import os
 
-from tensorflow.python.keras.callbacks import ModelCheckpoint, TensorBoard, ReduceLROnPlateau
-from tensorflow.python.keras.optimizers import Adam
+import tensorflow as tf
 
-from trainer.model import get_model
+from models import build_model
 from trainer.data import make_dataset
 from trainer.names import FEATURE_TO_DIM
 from trainer.utils.callbacks import PrettyLogger
@@ -16,7 +15,7 @@ TEST_NUM = 10
 
 
 def get_callbacks(monitor, mode, args):
-    chp = ModelCheckpoint(
+    chp = tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(args.path_output, "model.h5"),
         monitor=monitor,
         save_best_only=True,
@@ -31,24 +30,24 @@ def get_callbacks(monitor, mode, args):
     #     mode=mode,
     #     verbose=1)
 
-    tb = TensorBoard(
+    tb = tf.keras.callbacks.TensorBoard(
         log_dir=os.path.join(args.path_output, "graph"),
         histogram_freq=0,
         write_graph=True,
         write_grads=False)
 
-    rlr = ReduceLROnPlateau(
-        monitor=monitor,
-        factor=0.5,
-        patience=args.epoch_num // 10,
-        min_lr=1e-5,
-        mode=mode,
-        min_delta=1e-2,
-        verbose=1)
+    # rlr = tf.keras.callbacks.ReduceLROnPlateau(
+    #     monitor=monitor,
+    #     factor=0.5,
+    #     patience=args.epoch_num // 10,
+    #     min_lr=1e-5,
+    #     mode=mode,
+    #     min_delta=1e-2,
+    #     verbose=1)
 
     pl = PrettyLogger(display=20)
 
-    return [chp, tb, rlr, pl]
+    return [chp, tb, pl]
 
 
 def train(args):
@@ -62,10 +61,12 @@ def train(args):
 
     feature_dim = sum([FEATURE_TO_DIM[f] for f in args.feature_name.split('_')])
 
-    model = get_model(args.model_name, feature_dim=feature_dim)
+    # model = get_model(args.model_name, feature_dim=feature_dim)
+    model = build_model(name=args.model_name, feature_dim=feature_dim,
+                        head_type=args.head_type, filters=args.filters, kernels=args.kernels)
 
     model.compile(
-        Adam(lr=args.learning_rate),
+        tf.keras.optimizers.Adam(lr=args.learning_rate),
         loss='mse',
         metrics=make_metrics())
 
@@ -77,7 +78,7 @@ def train(args):
         validation_steps=max(1, TEST_NUM//args.batch_size),
         verbose=0,
         callbacks=get_callbacks(
-            monitor='loss',
+            monitor='val_loss',
             mode='min',
             args=args))
 
@@ -103,6 +104,26 @@ if __name__ == '__main__':
     parser.add_argument(
         '--job-name',
         help='name of job',
+        required=True
+    )
+
+    parser.add_argument(
+        '--head-type',
+        help='choose among "de", "vector", "scalar"',
+        required=True
+    )
+
+    parser.add_argument(
+        '--filters',
+        help='list of filters per layer',
+        type=lambda x: [int(x_) for x_ in x.split('_')],
+        required=True
+    )
+
+    parser.add_argument(
+        '--kernels',
+        help='list of kernels per layer',
+        type=lambda x: [(int(x_), int(x_)) for x_ in x.split('_')],
         required=True
     )
 

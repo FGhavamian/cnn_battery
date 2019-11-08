@@ -3,24 +3,24 @@ from trainer.utils.util import *
 
 def _make_features():
     return dict(
-        x=tf.FixedLenFeature([], tf.string),
-        y=tf.FixedLenFeature([], tf.string),
-        mask=tf.FixedLenFeature([], tf.string),
-        height=tf.FixedLenFeature([], tf.int64),
-        width=tf.FixedLenFeature([], tf.int64),
-        depth_x=tf.FixedLenFeature([], tf.int64),
-        depth_y=tf.FixedLenFeature([], tf.int64),
-        name=tf.FixedLenFeature([], tf.string)
+        x=tf.io.FixedLenFeature([], tf.string),
+        y=tf.io.FixedLenFeature([], tf.string),
+        mask=tf.io.FixedLenFeature([], tf.string),
+        height=tf.io.FixedLenFeature([], tf.int64),
+        width=tf.io.FixedLenFeature([], tf.int64),
+        depth_x=tf.io.FixedLenFeature([], tf.int64),
+        depth_y=tf.io.FixedLenFeature([], tf.int64),
+        name=tf.io.FixedLenFeature([], tf.string)
     )
 
 
 def _parser(serialized_example):
-    features = tf.parse_single_example(
+    features = tf.io.parse_single_example(
         serialized_example,
         features=_make_features())
 
     def process_image(img, shape):
-        img = tf.decode_raw(img, tf.float32)
+        img = tf.io.decode_raw(img, tf.float32)
         return tf.reshape(img, shape)
 
     shape_x = [features['height'], features['width'], features['depth_x']]
