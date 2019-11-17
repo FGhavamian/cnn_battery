@@ -48,7 +48,7 @@ def main(args):
     score_test = evaluate(dataset_test, model)
     scores = dict(train=score_train, test=score_test)
 
-    scores_path = os.path.join(*args.path_model.split('/')[:-1], 'score.json')
+    scores_path = os.path.join(*args.path_model.split(os.path.sep)[:-1], 'score.json')
     write_json(scores_path, scores)
 
 
