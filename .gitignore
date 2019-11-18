@@ -1,6 +1,5 @@
 data/
 fem_davide
-output/
 report
 .idea/*
 *.tfrecords
@@ -8,5 +7,6 @@ report
 *.vtu
 *.mesh
 *.png
+*.h5
 *__pycache__*
 *.ipynb_checkpoints*

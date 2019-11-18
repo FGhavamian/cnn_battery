@@ -3,10 +3,10 @@ import os
 
 from trainer.utils.util import *
 
-EXAMPLE_NAME = 'learning_rate'
+EXAMPLE_NAME = 'depth_size'
 
-NUM_TESTS = 5
-EPOCH_NUM = 500
+NUM_TESTS = 3
+EPOCH_NUM = 200
 
 MODEL_NAMES = [
     'simple'
@@ -19,27 +19,38 @@ HEAD_TYPES = [
 ]
 
 FILTERS = [
-    '16_32'
+    # '8',
+    # '8_16',
+    # '8_16_32',
+    # '16',
+    # '16_32',
+    # '16_32_64',
+    # '32',
+    # '32_64',
+    # '32_64_128',
+    '64',
+    # '64_128',
+    # '64_128_256'
 ]
 
 KERNELS = [
-    '7_7'
+   '7' # '7_7'
 ]
 
 FEATURE_NAMES = [
-    # 'boundary_edge_surface',
+    'boundary_edge_surface',
     # 'boundary_surface',
     # 'boundary_edge',
-    # 'surface_edge',
-    'boundary',
+    # 'edge_surface',
+    # 'boundary',
     # 'surface',
     # 'edge'
 ]
 
 LEARNING_RATES = [
-    1e-2,
+    # 1e-2,
     1e-3,
-    1e-4
+    # 1e-4
 ]
 
 TRAIN_DATA_PERCENTAGES = [
@@ -102,9 +113,17 @@ def main():
 
                                     dir_tfrecords = feature_name + '_' + str(train_data_pct)
                                     path_tfrecords = os.path.join('data', 'processed', dir_tfrecords, 'tfrecords')
+
                                     path_output = os.path.join(
-                                        'output', EXAMPLE_NAME, str(train_data_pct),
-                                        str(learning_rate), model_name, feature_name)
+                                        'output',
+                                        EXAMPLE_NAME,
+                                        str(train_data_pct),
+                                        str(learning_rate),
+                                        model_name,
+                                        feature_name,
+                                        'filter_' + filter,
+                                        'kernel_' + kernel
+                                    )
 
                                     print(f'tfrecords are at: {path_tfrecords}')
                                     print(f'outputs are at: {path_output}')
