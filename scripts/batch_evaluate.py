@@ -6,7 +6,7 @@ import pandas as pd
 
 from trainer.utils.util import read_json, write_json
 
-EXAMPLE_NAME = 'depth_size'
+EXAMPLE_NAME = 'data_percentage'
 
 DIR_EXAMPLES = os.path.join('output', EXAMPLE_NAME)
 

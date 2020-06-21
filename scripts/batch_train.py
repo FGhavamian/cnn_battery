@@ -3,7 +3,7 @@ import os
 
 from trainer.utils.util import *
 
-EXAMPLE_NAME = 'depth_size'
+EXAMPLE_NAME = 'data_percentage'
 
 NUM_TESTS = 3
 EPOCH_NUM = 200
@@ -26,9 +26,9 @@ FILTERS = [
     # '16_32',
     # '16_32_64',
     # '32',
-    # '32_64',
+    '32_64',
     # '32_64_128',
-    '64',
+    # '64',
     # '64_128',
     # '64_128_256'
 ]
@@ -54,9 +54,9 @@ LEARNING_RATES = [
 ]
 
 TRAIN_DATA_PERCENTAGES = [
-    # 0.25,
-    # 0.5,
-    # 0.75,
+    0.25,
+    0.5,
+    0.75,
     1.0
 ]
 
