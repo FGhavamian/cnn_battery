@@ -1,6 +1,7 @@
 data/
 fem_davide
 report
+output/*
 .idea/*
 *.tfrecords
 *.pkl
