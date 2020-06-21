@@ -3,7 +3,7 @@ import tensorflow as tf
 from trainer.names import GRID_DIM
 
 
-class ModelSimple:
+class ModelSimpleBN:
     def __init__(self, feature_dim, target_dim_dict, filters, kernels):
         self.feature_dim = feature_dim
         self.target_dim_dict = target_dim_dict
@@ -16,8 +16,7 @@ class ModelSimple:
         heads = self._heads(z)
         output = self._hydra_output(heads, mask)
 
-        model = tf.keras.models.Model(inputs=(feature, mask), outputs=output)
-        return model
+        return tf.keras.models.Model(inputs=(feature, mask), outputs=output)
 
     def _heads(self, z):
         heads = []
@@ -28,16 +27,20 @@ class ModelSimple:
         return heads
 
     def _encoder(self, x):
-        kernel = self.kernels[0]
-        for i, filt in enumerate(self.filters):
-            x = tf.keras.layers.Conv2D(filt, kernel, 2, 'same', activation='relu', name="encoder" + str(i))(x)
+        x = tf.keras.layers.Conv2D(self.filters[0], self.kernels[0], 2, 'same', activation='relu', name="encoder0")(x)
+
+        for i, (filter, kernel) in enumerate(zip(self.filters[1:], self.kernels[1:])):
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Conv2D(filter, kernel, 2, 'same', activation='relu', name="encoder" + str(i+1))(x)
 
         return x
 
     def _decoder(self, x, mode):
-        kernel = self.kernels[0]
-        for i, filt in enumerate(self.filters[::-1]):
-            x = tf.keras.layers.Conv2DTranspose(filt, kernel, 2, 'same', activation='relu',
+        x = tf.keras.layers.Conv2D(self.filters[0], self.kernels[0], 2, 'same', activation='relu', name="encoder0")(x)
+
+        for i, (filter, kernel) in enumerate(zip(self.filters[1:], self.kernels[1:])):
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Conv2DTranspose(filter, kernel, 2, 'same', activation='relu',
                                                 name=mode + "decoder" + str(i))(x)
 
         return x
@@ -57,5 +60,5 @@ class ModelSimple:
 if __name__ == '__main__':
     from trainer.names import PHYSICAL_DIMS, PHYSICAL_DIMS_SCALAR
 
-    model = ModelSimple(16, PHYSICAL_DIMS_SCALAR, [32, 64, 128], [7, 7, 7]).build()
+    model = ModelSimpleBN(1, PHYSICAL_DIMS, [32, 16], [5, 5]).build()
     model.summary()
