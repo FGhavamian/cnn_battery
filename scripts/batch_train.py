@@ -34,7 +34,7 @@ FILTERS = [
 ]
 
 KERNELS = [
-   '7' # '7_7'
+    '7'  # '7_7'
 ]
 
 FEATURE_NAMES = [
@@ -70,7 +70,7 @@ def make_data(features, train_data_pct):
         features = [features]
 
     command = (
-        'python -m trainer.preprocess' 
+        'python -m trainer.preprocess'
         ' --features={}'
         ' --train-data-percentage={}'
     ).format(','.join(features), train_data_pct)
@@ -108,11 +108,14 @@ def main():
                         for filter in FILTERS:
                             for kernel in KERNELS:
                                 for num_test in range(NUM_TESTS):
-                                    print('running ', model_name, ' test number ', num_test)
+                                    print('running ', model_name,
+                                          ' test number ', num_test)
                                     job_name = make_job_name()
 
-                                    dir_tfrecords = feature_name + '_' + str(train_data_pct)
-                                    path_tfrecords = os.path.join('data', 'processed', dir_tfrecords, 'tfrecords')
+                                    dir_tfrecords = feature_name + \
+                                        '_' + str(train_data_pct)
+                                    path_tfrecords = os.path.join(
+                                        'data', 'processed', dir_tfrecords, 'tfrecords')
 
                                     path_output = os.path.join(
                                         'output',
@@ -122,14 +125,15 @@ def main():
                                         model_name,
                                         feature_name,
                                         'filter_' + filter,
-                                        'kernel_' + kernel
-                                    )
+                                        'kernel_' + kernel)
 
-                                    print(f'tfrecords are at: {path_tfrecords}')
+                                    print(
+                                        f'tfrecords are at: {path_tfrecords}')
                                     print(f'outputs are at: {path_output}')
 
-                                    train(job_name, feature_name, model_name, head_type, filter, kernel,
-                                          learning_rate, path_output, path_tfrecords)
+                                    train(
+                                        job_name, feature_name, model_name, head_type, filter, kernel,
+                                        learning_rate, path_output, path_tfrecords)
 
 
 if __name__ == '__main__':

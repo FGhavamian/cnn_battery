@@ -96,13 +96,13 @@ class FeatureMakerBoundary:
 if __name__ == '__main__':
     mesh_data = dict()
     mesh_data['name'] = 'cnn_test'
-    mesh_data['coord'] = np.array(
-        [[0, 0],
-         [2, 0],
-         [2, 2],
-         [0, 2],
-         [1, 1]]
-    )
+    mesh_data['coord'] = np.array([
+        [0, 0],
+        [2, 0],
+        [2, 2],
+        [0, 2],
+        [1, 1]])
+        
     mesh_data['groups_node'] = dict(
         left=[0, 3],
     )
