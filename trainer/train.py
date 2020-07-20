@@ -4,50 +4,11 @@ import os
 
 import tensorflow as tf
 
-from models import build_model
-from trainer.data import make_dataset
-from trainer.names import FEATURE_TO_DIM
-from trainer.utils.callbacks import PrettyLogger
-from trainer.utils import make_metrics
-
-TRAIN_NUM = 40
-TEST_NUM = 10
-
-
-def get_callbacks(monitor, mode, args):
-    chp = tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(args.path_output, "model.h5"),
-        monitor=monitor,
-        save_best_only=True,
-        mode=mode,
-        period=args.epoch_num // 100,
-        verbose=1)
-
-    # es = EarlyStopping(
-    #     monitor=monitor,
-    #     patience=args.epoch_num // 1000,
-    #     min_delta=1e-5,
-    #     mode=mode,
-    #     verbose=1)
-
-    tb = tf.keras.callbacks.TensorBoard(
-        log_dir=os.path.join(args.path_output, "graph"),
-        histogram_freq=0,
-        write_graph=True,
-        write_grads=False)
-
-    # rlr = tf.keras.callbacks.ReduceLROnPlateau(
-    #     monitor=monitor,
-    #     factor=0.5,
-    #     patience=args.epoch_num // 10,
-    #     min_lr=1e-5,
-    #     mode=mode,
-    #     min_delta=1e-2,
-    #     verbose=1)
-
-    pl = PrettyLogger(display=20)
-
-    return [chp, tb, pl]
+from ml.model import build_model
+from ml.data import make_dataset
+from ml.names import FEATURE_TO_DIM
+from ml.utils.callbacks import get_callbacks
+from ml.utils import make_metrics
 
 
 def train(args):
@@ -58,12 +19,16 @@ def train(args):
     dataset_test = make_dataset(
         args.path_tfrecords,
         batch_size=args.batch_size, mode='test')
-
-    feature_dim = sum([FEATURE_TO_DIM[f] for f in args.feature_name.split('_')])
-
-    # model = get_model(args.model_name, feature_dim=feature_dim)
-    model = build_model(name=args.model_name, feature_dim=feature_dim,
-                        head_type=args.head_type, filters=args.filters, kernels=args.kernels)
+  
+    feature_dim = sum(
+        [FEATURE_TO_DIM[f] for f in args.feature_name.split('_')]
+    )
+    model = build_model(
+        name=args.model_name, 
+        feature_dim=feature_dim,
+        head_type=args.head_type, 
+        filters=args.filters, 
+        kernels=args.kernels)
 
     model.compile(
         tf.keras.optimizers.Adam(lr=args.learning_rate),
@@ -74,8 +39,8 @@ def train(args):
         x=dataset_train,
         epochs=args.epoch_num,
         validation_data=dataset_test,
-        steps_per_epoch=max(1, TRAIN_NUM//args.batch_size),
-        validation_steps=max(1, TEST_NUM//args.batch_size),
+        steps_per_epoch=max(1, args.n_train_samples//args.batch_size),
+        validation_steps=max(1, args.n_test_samples//args.batch_size),
         verbose=0,
         callbacks=get_callbacks(
             monitor='val_loss',
@@ -104,48 +69,53 @@ if __name__ == '__main__':
     parser.add_argument(
         '--job-name',
         help='name of job',
-        required=True
-    )
+        required=True)
 
     parser.add_argument(
         '--head-type',
         help='choose among "de", "vector", "scalar"',
-        required=True
-    )
+        required=True)
 
     parser.add_argument(
         '--filters',
         help='list of filters per layer',
         type=lambda x: [int(x_) for x_ in x.split('_')],
-        required=True
-    )
+        required=True)
 
     parser.add_argument(
         '--kernels',
         help='list of kernels per layer',
         type=lambda x: [(int(x_), int(x_)) for x_ in x.split('_')],
-        required=True
-    )
+        required=True)
 
     parser.add_argument(
         '--feature-name',
         help='name of features',
         type=lambda x: '_'.join(sorted(x.split('_'))),
-        required=True
-    )
+        required=True)
 
     parser.add_argument(
         '--path-tfrecords',
         help='path to tfrecords files',
-        required=True
-    )
+        required=True)
+
+    parser.add_argument(
+        '--n-train-samples',
+        help='number of training samples',
+        type=int,
+        required=True)
+
+    parser.add_argument(
+        '--n-test-samples',
+        help='number of test samples',
+        type=int,
+        required=True)
 
     parser.add_argument(
         '--epoch-num',
         help='max number of epochs',
         type=int,
-        default=1000
-    )
+        default=1000)
 
     parser.add_argument(
         '--learning-rate',
@@ -156,15 +126,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--ex-path',
         help='example number which is used in the path of output file',
-        default='test'
-    )
+        default='test')
 
     parser.add_argument(
         '--batch-size',
         help='batch size',
         type=int,
-        default=16
-    )
+        default=16)
 
     args = parser.parse_args()
 

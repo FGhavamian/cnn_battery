@@ -1,7 +1,9 @@
-from tensorflow.python.keras.callbacks import Callback
+import os
+
+import tensorflow as tf
 
 
-class PrettyLogger(Callback):
+class PrettyLogger(tf.keras.callbacks.Callback):
     def __init__(self, display):
         super().__init__()
         self.display = display
@@ -19,13 +21,6 @@ class PrettyLogger(Callback):
         if not self.logs_old:
             self.logs_old = logs
 
-        # metrics = [m for m in self.params['metrics'] if 'val' not in m]
-        # for metric in metrics:
-        #     print('\t{:<15} {:<15.3f} -> {:<20.3f} {:<20} {:<15.3f} -> {:<20.3f}'.format(
-        #         metric, self.logs_old[metric], logs[metric],
-        #         'val_' + metric, self.logs_old['val_' + metric], logs['val_' + metric]
-        #     ))
-
         for metric in self.params['metrics']:
             print('\t{:<30} {:<5.3f} -> {:<10.3f}'.format(
                 metric, self.logs_old[metric], logs[metric])
@@ -36,4 +31,41 @@ class PrettyLogger(Callback):
         print()
 
     def print_some(self, epoch, logs):
-        print('{}/{} -- loss {}'.format(epoch, self.params['epochs'], logs['loss']), end='\r')
+        print(f'{epoch}/{self.params["epochs"]} -- loss {logs["loss"]}',
+              end='\r')
+
+
+def get_callbacks(monitor, mode, args):
+    chp = tf.keras.callbacks.ModelCheckpoint(
+        filepath=os.path.join(args.path_output, "model.h5"),
+        monitor=monitor,
+        save_best_only=True,
+        mode=mode,
+        period=args.epoch_num // 100,
+        verbose=1)
+
+    # es = EarlyStopping(
+    #     monitor=monitor,
+    #     patience=args.epoch_num // 1000,
+    #     min_delta=1e-5,
+    #     mode=mode,
+    #     verbose=1)
+
+    tb = tf.keras.callbacks.TensorBoard(
+        log_dir=os.path.join(args.path_output, "graph"),
+        histogram_freq=0,
+        write_graph=True,
+        write_grads=False)
+
+    # rlr = tf.keras.callbacks.ReduceLROnPlateau(
+    #     monitor=monitor,
+    #     factor=0.5,
+    #     patience=args.epoch_num // 10,
+    #     min_lr=1e-5,
+    #     mode=mode,
+    #     min_delta=1e-2,
+    #     verbose=1)
+
+    pl = PrettyLogger(display=20)
+
+    return [chp, tb, pl]

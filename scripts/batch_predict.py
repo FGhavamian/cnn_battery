@@ -5,9 +5,9 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
-from trainer.predict import Predictor
-from trainer.utils.util import *
-from trainer.names import GRID_DIM
+from ml.predict import Predictor
+from ml.utils.util import *
+from ml.names import GRID_DIM
 
 
 # learning rate

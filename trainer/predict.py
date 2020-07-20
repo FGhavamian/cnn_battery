@@ -4,32 +4,31 @@ from trainer.preprocess import PreprocessBatch
 from trainer.utils.util import *
 
 
-def extract_case_name(path_mesh):
-    return path_mesh.split('/')[-1].replace('.mesh', '')
+# def extract_case_name(path_mesh):
+#     return path_mesh.split(os.path.sep)[-1].replace('.mesh', '')
 
 
 def extract_model_name(path_model):
-    return path_model.split('/')[1]
+    return path_model.split(os.path.sep)[1]
     # return os.path.join(*path_model.split('/')[-3:-1])
 
 
 def extract_feature_name(path_stats):
-    return path_stats.split('/')[2].split('_')
+    return path_stats.split(os.path.sep)[-1].split('_')[:-1]
 
 
 class Predictor:
-    def __init__(self, path_model, path_stats, do_write2vtk=True, preprocess_path=None):
+    def __init__(self, path_model, path_stats, preprocess_path, do_write2vtk=True):
         """
 
         Args:
             path_model (): path to the keras model file
             path_stats (): path to the directory where stats_x, stats_y can be found
-            path_data (): path to the data directory where .mesh and .vtu file can be found
+            preprocess_path (): path at which the preprocessor is saved as a pickle file
             do_write2vtk (): do write the outputs to a vtu file?
         """
-
         self.feature_name = extract_feature_name(path_stats)
-        self.model_name = extract_model_name(path_model)
+        # self.model_name = extract_model_name(path_model)
 
         self.model = self._load_model(path_model)
         self.stats = self._load_stats(path_stats)
@@ -49,7 +48,7 @@ class Predictor:
 
         y = self._destandardize_prediction(self.pp.y)
 
-        geom_fields = inputs
+        fields_geom = inputs
 
         sig_vm = {
             'y': self._compute_vm_stress(y),
@@ -66,12 +65,12 @@ class Predictor:
             'pred': self._compute_ion_concentration(pred)
         }
 
-        fields = {
+        fields_sol = {
             'y': y,
             'pred': pred
         }
 
-        return geom_fields, fields, sig_vm, i_m, c, self.pp
+        return fields_geom, fields_sol, sig_vm, i_m, c, self.pp
 
     @staticmethod
     def _compute_vm_stress(fields):
@@ -114,7 +113,6 @@ class Predictor:
         #             self.__write2vtk(ref[name], case_name=name, mode='ref', pre_mode=pre_mode)
         #             self.__write2vtk(err[name], case_name=name, mode='err', pre_mode=pre_mode)
 
-
     # def _write2vtk(self, pred, case_name, mode, pre_mode):
     #     node_coord = self.pp.mesh_data[case_name]['coord']
     #     element_connect = self.pp.mesh_data[case_name]['element_connect']
@@ -155,9 +153,7 @@ class Predictor:
     #     return pred_on_node
 
     def _make_prediction(self, inputs):
-        output = self.model.predict(inputs, steps=1)
-
-        return output
+        return self.model.predict(inputs, steps=1)
 
     def _get_inputs(self):
         return dict(feature=self.pp.x, mask=self.pp.mask)
@@ -173,7 +169,7 @@ class Predictor:
                 pickle.dump(self.pp, file)
 
     def _get_preprocessor(self, path_stats):
-        return PreprocessBatch(is_train=False, path_output=path_stats, feature_name=self.feature_name)
+        return PreprocessBatch(is_train=False, path_output=path_stats, feature_name=self.feature_name, grid_dim=(512, 64))
 
     @staticmethod
     def _load_model(path_model):

@@ -13,9 +13,11 @@ from joblib import Parallel, delayed
 import tensorflow as tf
 
 from trainer.utils.parsers import read_mesh, read_vtu
-from trainer.utils.util import (to_float32, load_from_pickle, save_to_pickle,
-                                bytes_feature, int64_feature, numpy_to_bytes,
-                                chunks, write_json)
+from trainer.utils import (
+    to_float32, load_from_pickle, save_to_pickle,
+    bytes_feature, int64_feature, numpy_to_bytes,
+    chunks, write_json
+)
 from trainer.features import FeatureMaker
 from trainer.names import *
 
@@ -86,13 +88,13 @@ class DataHolder:
 
 
 class PreprocessBatch(DataHolder):
-    def __init__(self, is_train, path_output, feature_name, grid_size=0.5):
+    def __init__(self, is_train, path_output, feature_name, grid_dim):
         DataHolder.__init__(self)
 
         self.is_train = is_train
         self.path_output = path_output
         self.feature_name = feature_name
-        self.grid_size = grid_size
+        self.grid_dim = grid_dim
 
         self.grid = None
 
@@ -132,15 +134,6 @@ class PreprocessBatch(DataHolder):
 
         self.compiled = True
 
-        # import matplotlib.pyplot as plt
-        # for i in range(self.y.shape[-1]):
-        #     plt.figure()
-        #     plt.contourf(
-        #         self.grid['grid'][:, 0].reshape(self.grid['dim']),
-        #         self.grid['grid'][:, 1].reshape(self.grid['dim']),
-        #         self.y[0, :, i].reshape(self.grid['dim']))
-        #     plt.show()
-
     def populate(self, case_names, paths_mesh, paths_vtu=None):
         if not isinstance(case_names, list):
             case_names = [case_names]
@@ -162,26 +155,31 @@ class PreprocessBatch(DataHolder):
 
     @staticmethod
     def _shape_func_tri3(coord, el_coords):
-        x1 = el_coords[0][0]; y1 = el_coords[0][1]
-        x2 = el_coords[1][0]; y2 = el_coords[1][1]
-        x3 = el_coords[2][0]; y3 = el_coords[2][1]
+        x1 = el_coords[0][0] 
+        y1 = el_coords[0][1]
+        x2 = el_coords[1][0] 
+        y2 = el_coords[1][1]
+        x3 = el_coords[2][0] 
+        y3 = el_coords[2][1]
 
-        a0 = x1; b0 = y1
-        a1 = x2 - x1; b1 = y2 - y1
-        a2 = x3 - x1; b2 = y3 - y1
+        a0 = x1
+        b0 = y1
+        a1 = x2 - x1
+        b1 = y2 - y1
+        a2 = x3 - x1
+        b2 = y3 - y1
 
-        xhat = coord[0]; yhat = coord[1]
+        xhat = coord[0]
+        yhat = coord[1]
 
-        etahat = (a1 * yhat - b1 * xhat + b1 * a0 - a1 * b0) / (a1 * b2 - a2 * b1 + 1e-8)
-        xihat = (xhat - a0 - a2 * etahat) / (a1 + 1e-8)
+        etahat = (a1*yhat - b1*xhat + b1*a0 - a1*b0) / (a1*b2 - a2*b1 + 1e-8)
+        xihat = (xhat - a0 - a2*etahat) / (a1 + 1e-8)
 
         n1 = 1 - xihat - etahat
         n2 = xihat
         n3 = etahat
 
-        n = np.array([n1, n2, n3])
-
-        return n
+        return np.array([n1, n2, n3])
 
     @staticmethod
     def _find_grids_in_each_element(grid, mesh):
@@ -223,8 +221,9 @@ class PreprocessBatch(DataHolder):
             grid_fields = grid_fields.reshape(*self.grid['dim'] + (-1,))
             return grid_fields
 
-        fields_grid_list = Parallel(n_jobs=3, prefer="threads")(delayed(interpolator)(case_name)
-                                                              for case_name in tqdm(fields_dict.keys()))
+        par = Parallel(n_jobs=3, prefer="threads")
+        fields_grid_list = par(delayed(interpolator)(case_name)
+                               for case_name in tqdm(fields_dict.keys()))
 
         fields_on_grid = np.stack(fields_grid_list, axis=0)
         fields_on_grid = fields_on_grid.astype(np.float32)
@@ -277,31 +276,9 @@ class PreprocessBatch(DataHolder):
 
         return features
 
-
-    # def _interpolate_solution(self):
-    #     case_names = list(self.vtu_data.keys())
-    #     grid = self.grid["grid"]
-    #
-    #     targets_batch = []
-    #     for case_name in case_names:
-    #         node_coord = self.vtu_data[case_name]["coord"]
-    #
-    #         target_on_node = self.vtu_data[case_name]["solutions"]
-    #
-    #         f = NearestNDInterpolator(node_coord, target_on_node)
-    #
-    #         target_on_grid = f(grid)
-    #
-    #         targets_batch.append(target_on_grid)
-    #
-    #     self.y = np.stack(targets_batch)
-    #     self.y = self.y.reshape(-1, *self.grid["dim"], self.y.shape[-1])
-
     @staticmethod
     def _normalize(x, stats):
-        x = (x - stats["mean"]) / (stats["std"] + 1e-8)
-
-        return x
+        return (x - stats["mean"]) / (stats["std"] + 1e-8)
 
     def _compute_stats(self, x, mode):
         mean_s = np.mean(x, axis=(0, 1, 2), keepdims=True, dtype=np.float32)
@@ -359,8 +336,8 @@ class PreprocessBatch(DataHolder):
         # grid_num_x = 2 ** np.ceil(np.log2(X_MAX / self.grid_size))
         # grid_num_y = 2 ** np.ceil(np.log2(Y_MAX / self.grid_size))
 
-        x = np.linspace(0, x_max, GRID_DIM.x, dtype=np.float32)
-        y = np.linspace(0, y_max, GRID_DIM.y, dtype=np.float32)
+        x = np.linspace(0, x_max, self.grid_dim[1], dtype=np.float32)
+        y = np.linspace(0, y_max, self.grid_dim[0], dtype=np.float32)
 
         x_grid, y_grid = np.meshgrid(x, y)
 
@@ -462,29 +439,26 @@ if __name__ == '__main__':
         '--features', '-f',
         help='name of features to include, underscored seperated',
         type=lambda x: sorted(x.split('_')),
-        required=True
-    )
+        required=True)
 
     parser.add_argument(
         '--path-data', '-d',
         help='path to mesh and vtu files',
-        default=os.path.join('data', 'raw', 'ex2')
-    )
+        default=os.path.join('data', 'raw'))
 
     parser.add_argument(
         '--path-output', '-o',
         help='path where processed data are stored',
-        default=os.path.join('data', 'processed')
-    )
+        default=os.path.join('data', 'processed'))
 
     parser.add_argument(
         '--train-data-percentage', '-tdp',
         help='percentage of data to use for training',
         type=float,
-        default=1.0
-    )
+        default=1.0)
 
     args = parser.parse_args()
+
     args.path_output = make_output_dir(args.path_output, args.features, args.train_data_percentage)
 
     print('[INFO] reading mesh and vtu files ...')
