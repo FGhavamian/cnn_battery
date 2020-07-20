@@ -1,1 +1,1 @@
-from .callbacks import PrettyLogger
+from .callbacks import get_callbacks

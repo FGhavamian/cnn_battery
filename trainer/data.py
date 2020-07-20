@@ -3,7 +3,7 @@ import os
 
 import tensorflow as tf 
 
-from ml.utils.util import *
+from trainer.utils.util import *
 
 
 def _make_features():
