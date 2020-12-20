@@ -1,4 +1,4 @@
-# HydraNet as a surrogate for FEM simulation of Lithium-ion batteries
+# HydraNet as a surrogate <br/> for FEM simulation of Lithium-ion batteries
 
 The code that generates results in paper [A convolution neural network-based surrogate for finite element analysis of multi-physics problems](PAPER_LINK) paper.
 
