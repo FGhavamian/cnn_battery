@@ -1,6 +1,6 @@
 from scipy.interpolate import NearestNDInterpolator
 
-from trainer.preprocess import PreprocessBatch
+from trainer.preprocess import Preprocessor
 from trainer.utils.util import *
 
 
@@ -169,7 +169,7 @@ class Predictor:
                 pickle.dump(self.pp, file)
 
     def _get_preprocessor(self, path_stats):
-        return PreprocessBatch(is_train=False, path_output=path_stats, feature_name=self.feature_name, grid_dim=(512, 64))
+        return Preprocessor(is_train=False, path_output=path_stats, feature_name=self.feature_name, grid_dim=(512, 64))
 
     @staticmethod
     def _load_model(path_model):
