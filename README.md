@@ -16,7 +16,7 @@ To train the model, adjust parameters at the top of the `scripts/batch_train.py`
 The model and metadata is saved in a directory under `output` directory.  
 
 As an example, we have commited a saved model.
-Find it at `output/data_percentage/1.0/0.001/simple/boundary_edge_surface/filter_32_64/kernel_7/cnn_20201220_113015`
+Find it at `output/data_percentage/1.0/0.001/simple/boundary_edge_surface/filter_32_64/kernel_7/cnn_20201220_113015`. And accompanying data at `data/processed/boundary_edge_surface_1.0`.
 
 ## Evaluation
 ---
