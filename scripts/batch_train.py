@@ -1,11 +1,12 @@
 from datetime import datetime
 import os
+from pathlib import Path
 
-from trainer.utils.util import *
+import trainer.utils.util as U
 
 EXAMPLE_NAME = 'data_percentage'
 
-NUM_TESTS = 3
+NUM_TESTS = 1
 EPOCH_NUM = 200
 
 MODEL_NAMES = [
@@ -54,9 +55,9 @@ LEARNING_RATES = [
 ]
 
 TRAIN_DATA_PERCENTAGES = [
-    0.25,
-    0.5,
-    0.75,
+    # 0.25,
+    # 0.5,
+    # 0.75,
     1.0
 ]
 
@@ -76,9 +77,14 @@ def make_data(features, train_data_pct):
     ).format(','.join(features), train_data_pct)
 
     os.system(command)
-
+    
 
 def train(job_name, feature_name, model_name, head_type, filter, kernel, learning_rate, path_output, path_tfrecords):
+    path_names = os.path.join(Path(path_tfrecords).parent, "names.json")
+    names = U.read_json(path_names)
+    n_train_samples = len(names["train"])
+    n_test_samples = len(names["test"])
+
     feature_name = '_'.join(sorted(feature_name.split('_')))
 
     command = (
@@ -93,6 +99,8 @@ def train(job_name, feature_name, model_name, head_type, filter, kernel, learnin
         ' --learning-rate={}'
         ' --ex-path={}'
         ' --epoch-num={}'
+        f' --n-train-samples={n_train_samples}'
+        f' --n-test-samples={n_test_samples}'
     ).format(model_name, head_type, job_name, feature_name, filter, kernel, path_tfrecords, learning_rate, path_output, EPOCH_NUM)
 
     os.system(command)
