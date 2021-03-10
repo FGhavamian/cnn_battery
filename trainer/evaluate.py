@@ -5,17 +5,17 @@ from trainer.utils.util import *
 from trainer.names import *
 
 
-def load_model(path_model):
-    metric_funcs = make_metrics()
+def load_model(path_model, head_type, target_dims):
+    metric_funcs = make_metrics(head_type)
     metric_names = []
-    for sol_name, sol_dim in SOLUTION_DIMS.items():
+    for sol_name, sol_dim in target_dims.items():
         for i in range(sol_dim):
             metric_names.append(sol_name + '_' + str(i))
 
     metric_names.append('all')
 
     custom_metrics = dict(zip(metric_names, metric_funcs))
-
+    print(custom_metrics)
     return keras.models.load_model(
         filepath=path_model,
         custom_objects=custom_metrics)
@@ -42,7 +42,9 @@ def make_datasets(args):
 def main(args):
     dataset_train, dataset_test = make_datasets(args)
 
-    model = load_model(args.path_model)
+    target_dims = get_target_dim_for(args.head_type)
+
+    model = load_model(args.path_model, args.head_type, target_dims)
 
     score_train = evaluate(dataset_train, model)
     score_test = evaluate(dataset_test, model)
@@ -63,6 +65,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '--dir-tfrecords',
         help='path to tfrecords files',
+        required=True
+    )
+
+    parser.add_argument(
+        '--head-type',
+        help='type of hydranet head',
         required=True
     )
 

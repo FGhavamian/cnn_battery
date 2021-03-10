@@ -11,6 +11,18 @@ import numpy as np
 from trainer.names import *
 
 
+def get_target_dim_for(head_type):
+    if head_type == 'de':
+        return SOLUTION_DIMS
+    elif head_type == 'vector':
+        return PHYSICAL_DIMS
+    elif head_type == 'scalar':
+        return PHYSICAL_DIMS_SCALAR
+    else:
+        raise (Exception("{} is not a headtype model (choose among 'de', 'vector', 'scalar')".format(head_type)))
+
+
+
 def average_relative_error(name, index=None):
     def func(y_true, y_pred):
         if index:
@@ -26,11 +38,15 @@ def average_relative_error(name, index=None):
     return func
 
 
-def make_metrics():
+def make_metrics(head_type):
+    target_dims = get_target_dim_for(head_type)
+
+    target_dim = sum([target_dims[name] for name in target_dims])
+
     # TODO: pass mask here to compute number of nonzero grid points
-    indexes = [i for i in range(TARGET_DIM)]
+    indexes = [i for i in range(target_dim)]
     names = [[name + '_' + str(i) for i in range(size)]
-             for name, size in SOLUTION_DIMS.items()]
+             for name, size in target_dims.items()]
     names = [name for name_list in names for name in name_list]
 
     ares = [average_relative_error(*index_name)

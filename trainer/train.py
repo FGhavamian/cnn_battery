@@ -29,11 +29,11 @@ def train(args):
         head_type=args.head_type,
         filters=args.filters,
         kernels=args.kernels)
-
+    
     model.compile(
         tf.keras.optimizers.Adam(lr=args.learning_rate),
         loss='mse',
-        metrics=[make_metrics()])
+        metrics=[make_metrics(args.head_type)])
 
     model.fit(
         x=dataset_train,

@@ -33,8 +33,6 @@ PHYSICAL_DIMS_SCALAR['li_concentration'] = 1
 PHYSICAL_DIMS_SCALAR['li_flux_0'] = 1
 PHYSICAL_DIMS_SCALAR['li_flux_1'] = 1
 
-TARGET_DIM = sum([SOLUTION_DIMS[name] for name in SOLUTION_DIMS])
-
 FEATURE_TO_DIM = dict(
     boundary=10,
     surface=3,

@@ -7,5 +7,6 @@ from trainer.utils.util import (
     numpy_to_bytes,
     chunks,
     write_json,
-    make_metrics
+    make_metrics,
+    get_target_dim_for
 )

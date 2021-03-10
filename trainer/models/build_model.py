@@ -1,22 +1,10 @@
 from .model_simple import ModelSimple
 
-from trainer.names import PHYSICAL_DIMS_SCALAR, PHYSICAL_DIMS, SOLUTION_DIMS
+from trainer.utils import get_target_dim_for
 
 models = dict(
     simple=ModelSimple
 )
-
-
-def get_target_dim_for(head_type):
-    if head_type == 'de':
-        return SOLUTION_DIMS
-    elif head_type == 'vector':
-        return PHYSICAL_DIMS
-    elif head_type == 'scalar':
-        return PHYSICAL_DIMS_SCALAR
-    else:
-        raise (Exception("{} is not a headtype model (choose among 'de', 'vector', 'scalar')".format(head_type)))
-
 
 def get_model(name):
     if name in models.keys():
